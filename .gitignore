@@ -1,0 +1,115 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+.venv-clean/
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Models
+*.onnx
+*.engine
+*.torchscript
+models/engines/
+models/engine/
+models/onnx/
+models/torchscript/
+
+# YOLO service model directories
+services/yolo-inference/models/
+**/models/engine/
+**/models/engines/
+**/models/uploaded/
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Temp
+*.tmp
+*.bak
+*.backup
+pyproject.toml.backup
+requirements-local.txt
+
+# Docker volumes
+models/exports/
+# Old GUI (not needed)
+old-gui-test/
+
+# Cloned repos (temporary)
+Control-app/
+
+# Data folders (videos, clips)
+data/
+test-videos/
+
+# Sensitive files
+*.env
+.env.*
+!.env.example
+hashes.txt
+
+# Node modules
+node_modules/
+# Test data (large files: onnx, pt, mp4, sql, dump)
+test/
+
+# Large binary files
+*.onnx
+*.pt
+*.dump
+*.mp4
+*.zip
+*.engine
+*.avi
+*.mkv
+
+
+
+.redis_pw_*.txt
+
+# Auth/session cookie dumps (curl testing artifacts - may contain tokens)
+cookie*.txt
+cookies*.txt
+
+# Merge/debug/conflict artifacts
+.tmp-*
+conflict_details.diff
+uncommitted.diff
+*.diff
+git_log_processing.txt
+cj.txt
+fix.py
+
+# Service runtime log dumps
+*_logs.txt
+*_tail.txt
+
+# Diff dumps
+diff_*.txt
+
+*.db
+
