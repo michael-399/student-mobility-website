@@ -1,0 +1,58 @@
+<!-- Lecturer Dashboard Template -->
+<!-- Shows a table of the logged-in lecturer's assigned student applications. -->
+<!-- Each row links to the detail page where the lecturer can evaluate LAs, modifications, and scores. -->
+<h2>My Students' Applications</h2>
+
+<!-- Error banner - shown when the API call fails -->
+@if (error) {
+  <p class="error">{{ error }}</p>
+}
+
+<!-- Loading spinner placeholder -->
+@if (loading) {
+  <p class="muted">Loading...</p>
+}
+
+<!-- Empty-state message when no applications are assigned -->
+@if (!loading && !error && apps.length === 0) {
+  <p class="muted">No applications assigned to you yet.</p>
+}
+
+<!-- Main applications table - only rendered when data is available -->
+@if (!loading && apps.length > 0) {
+  <table>
+    <thead>
+      <tr>
+        <th>Student</th>
+        <th>Academic Year</th>
+        <th>Host Institution</th>
+        <th>Period</th>
+        <th>Status</th>
+        <th>Created</th>
+        <th></th><!-- Actions column -->
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Iterate over applications, tracking by MongoDB _id -->
+      @for (item of apps; track item._id) {
+        <tr>
+          <!-- Student name with fallback to em-dash when missing -->
+          <td>{{ item.studentId?.name ?? "—" }}</td>
+          <td>{{ item.academicYear }}</td>
+          <!-- Host institution - may be a populated object or a raw ID string -->
+          <td>{{ item.hostInstitutionId?.name ?? item.hostInstitutionId }}</td>
+          <!-- Display human-readable period label; fall back to raw value if unknown -->
+          <td>{{ periodLabel[item.expectedPeriod] ?? item.expectedPeriod }}</td>
+          <!-- Status badge with dynamic CSS class for colouring -->
+          <td><span [class]="'badge ' + item.status">{{ statusLabel[item.status] ?? item.status }}</span></td>
+          <!-- Format the creation timestamp with Angular's short date pipe -->
+          <td>{{ item.createdAt | date:"short" }}</td>
+          <td>
+            <!-- Link to the lecturer detail view for this application -->
+            <a [routerLink]="'/lecturer/' + item._id" class="btn-link">View</a>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

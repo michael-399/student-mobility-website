@@ -1,0 +1,55 @@
+# Root-level compose for the student-mobility (FastAPI) stack.
+#
+#   Frontend  http://localhost:4200  ->  FastAPI :8000  ->  PostgreSQL
+#
+# Start with:  docker compose up --build
+
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mobility
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mobility"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend-fastapi
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mobility
+      - JWT_SECRET=taw-secret-key
+      - UPLOAD_DIR=uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backend-fastapi:/app
+      - py-uploads:/app/uploads
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "4200:4200"
+    environment:
+      - API_PROXY_TARGET=http://backend:8000
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npx ng serve --host 0.0.0.0 --port 4200 --poll=2000"
+
+volumes:
+  pg-data:
+  py-uploads:

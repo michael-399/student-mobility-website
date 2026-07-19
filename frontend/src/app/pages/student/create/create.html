@@ -1,0 +1,85 @@
+<!-- Page header and navigation back to dashboard -->
+<h2>New Application</h2>
+
+<a routerLink="/student/dashboard" class="back">&larr; Back</a>
+
+<!-- Error banner displayed when loading dropdowns or submission fails -->
+@if (error) {
+  <div class="error">{{ error }}</div>
+}
+
+<!-- Main creation form; Angular reactive template-driven with ngSubmit -->
+<form (ngSubmit)="submit()">
+  <!-- Academic year selector – defaults to current academic year -->
+  <label>Academic Year</label>
+  <select [(ngModel)]="academicYear" name="year">
+    <option value="2024/2025">2024/2025</option>
+    <option value="2025/2026">2025/2026</option>
+    <option value="2026/2027">2026/2027</option>
+  </select>
+
+  <!-- Host institution dropdown – populated from InstitutionService -->
+  <label>Host Institution</label>
+  <select [(ngModel)]="hostInstitutionId" name="host">
+    <option value="">-- Select --</option>
+    @for (inst of institutions; track inst._id) {
+      <option [value]="inst._id">{{ inst.name }}, {{ inst.country }}</option>
+    }
+  </select>
+
+  <!-- Referent lecturer dropdown – the home university contact for this application -->
+  <label>Referent Lecturer</label>
+  <select [(ngModel)]="referentLecturerId" name="lecturer">
+    <option value="">-- Select --</option>
+    @for (lec of lecturers; track lec._id) {
+      <option [value]="lec._id">{{ lec.name }} ({{ lec.email }})</option>
+    }
+  </select>
+
+  <!-- Expected period of mobility (1st semester, 2nd semester, or full year) -->
+  <label>Expected Period</label>
+  <select [(ngModel)]="expectedPeriod" name="period">
+    <option value="first_semester">First Semester</option>
+    <option value="second_semester">Second Semester</option>
+    <option value="entire_year">Entire Academic Year</option>
+  </select>
+
+  <!-- Dynamic exam mappings – course equivalences between local and host institutions -->
+  <label>Exam Mappings</label>
+  @for (row of examMappings; track $index; let i = $index) {
+    <div class="exam-row">
+      <!-- Local (home institution) course details -->
+      <div class="exam-group">
+        <strong>Local (Home Institution)</strong>
+        <input type="text" [(ngModel)]="row.localCourseCode" [name]="'lcc_' + i" placeholder="Course code" />
+        <input type="text" [(ngModel)]="row.localCourseName" [name]="'lcn_' + i" placeholder="Course name" />
+        <input type="number" [(ngModel)]="row.localCredits" [name]="'lc_' + i" class="credits" placeholder="Credits" />
+      </div>
+      <!-- Foreign (host institution) course details -->
+      <div class="exam-group">
+        <strong>Foreign (Host Institution)</strong>
+        <input type="text" [(ngModel)]="row.foreignTeachingCode" [name]="'ftc_' + i" placeholder="Course code" />
+        <input type="text" [(ngModel)]="row.foreignCourseName" [name]="'fcn_' + i" placeholder="Course name" />
+        <input type="number" [(ngModel)]="row.foreignCredits" [name]="'fc_' + i" class="credits" placeholder="Credits" />
+      </div>
+      <!-- Remove button shown when more than one row exists -->
+      @if (examMappings.length > 1) {
+        <button type="button" class="btn-remove" (click)="removeRow(i)">X</button>
+      }
+    </div>
+  }
+  <!-- Add a new empty exam mapping row -->
+  <button type="button" class="btn-add" (click)="addRow()">+ Add exam</button>
+
+  <!-- Learning Agreement file upload – required to submit the application -->
+  <label>Learning Agreement (PDF) <span class="required">*</span></label>
+  <input type="file" (change)="onLAFile($event)" accept=".pdf" />
+  @if (!laFile) {
+    <span class="hint">Required — application cannot be saved without uploading the Learning Agreement.</span>
+  }
+
+  <!-- Submit button – disabled until form is valid and no submission is in progress -->
+  <button type="submit" class="btn-primary" [disabled]="!canSubmit() || submitting">
+    {{ submitting ? "Creating..." : "Create Application" }}
+  </button>
+</form>

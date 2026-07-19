@@ -1,0 +1,52 @@
+h2 {
+  margin-bottom: 1rem;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+th, td {
+  text-align: left;
+  padding: 0.625rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+th {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.badge.draft { background: #fef3c7; color: #92400e; }
+.badge.awaitingLA { background: #dbeafe; color: #1e40af; }
+.badge.laApproved { background: #d1fae5; color: #065f46; }
+.badge.preDepartureDone { background: #d1fae5; color: #065f46; }
+.badge.inProgress { background: #dbeafe; color: #1e40af; }
+.badge.modificationPending { background: #fef3c7; color: #92400e; }
+.badge.torUploaded { background: #e0e7ff; color: #3730a3; }
+.badge.closed { background: #d1fae5; color: #065f46; }
+.badge.canceled { background: #fee2e2; color: #991b1b; }
+.badge.needs.modifications { background: #fee2e2; color: #991b1b; }
+
+.muted {
+  color: #9ca3af;
+  margin-top: 1rem;
+}
+
+.btn-link {
+  color: #1976d2;
+  text-decoration: none;
+}

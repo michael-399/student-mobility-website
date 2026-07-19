@@ -1,0 +1,23 @@
+<nav>
+  <div class="nav-left">
+    @if (auth.isLoggedIn() && auth.getUser()?.role === "student") {
+      <a routerLink="/student/dashboard" class="brand">Student Mobility</a>
+    } @else if (auth.isLoggedIn() && auth.getUser()?.role === "lecturer") {
+      <a routerLink="/lecturer/dashboard" class="brand">Student Mobility</a>
+    } @else if (auth.isLoggedIn() && auth.getUser()?.role === "office") {
+      <a routerLink="/office/dashboard" class="brand">Student Mobility</a>
+    } @else {
+      <span class="brand">Student Mobility</span>
+    }
+  </div>
+  <div class="nav-right">
+    @if (auth.isLoggedIn()) {
+      <span class="nav-user">{{ auth.getUser()?.name }}</span>
+      <button class="btn-logout" (click)="logout()">Logout</button>
+    }
+  </div>
+</nav>
+
+<div class="container">
+  <router-outlet />
+</div>

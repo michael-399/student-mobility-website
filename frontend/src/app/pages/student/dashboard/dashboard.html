@@ -1,0 +1,60 @@
+<!-- Page header and CTA to create a new mobility application -->
+<h2>My Applications</h2>
+
+<a routerLink="/student/create" class="btn-primary">+ New Application</a>
+
+<!-- Error banner – shown when the API call fails -->
+@if (error) {
+  <p class="error">{{ error }}</p>
+}
+
+<!-- Loading spinner placeholder -->
+@if (loading) {
+  <p class="muted">Loading...</p>
+}
+
+<!-- Empty state – no applications have been created yet -->
+@if (!loading && !error && apps.length === 0) {
+  <p class="muted">No applications yet. Create one!</p>
+}
+
+<!-- Applications table – only rendered when data is available -->
+@if (!loading && apps.length > 0) {
+  <table>
+    <thead>
+      <tr>
+        <th>Academic Year</th>
+        <th>Host Institution</th>
+        <th>Period</th>
+        <th>Status</th>
+        <th>Referent Lecturer</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Iterate over student applications; track by MongoDB _id -->
+      @for (item of apps; track item._id) {
+        <tr>
+          <td>{{ item.academicYear }}</td>
+          <!-- Display institution name if populated, otherwise fall back to the raw ID -->
+          <td>{{ item.hostInstitutionId?.name ?? item.hostInstitutionId }}</td>
+          <!-- Map period enum to a human-readable label -->
+          <td>{{ periodLabel[item.expectedPeriod] ?? item.expectedPeriod }}</td>
+          <!-- Status badge with dynamic CSS class for color coding -->
+          <td><span [class]="'badge ' + item.status">{{ statusLabel[item.status] ?? item.status }}</span></td>
+          <td>{{ item.referentLecturerId?.name ?? "—" }}</td>
+          <!-- Format creation timestamp with Angular's short date pipe -->
+          <td>{{ item.createdAt | date:"short" }}</td>
+          <td>
+            <a [routerLink]="'/student/' + item._id" class="btn-link">View</a>
+            <!-- Only show delete button for non-closed applications -->
+            @if (item.status !== "closed") {
+              <button class="btn-danger" (click)="deleteApp(item._id)">Delete</button>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+}

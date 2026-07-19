@@ -1,0 +1,29 @@
+# System files
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# --- backend-fastapi (Python) ---
+backend-fastapi/__pycache__/
+backend-fastapi/**/__pycache__/
+backend-fastapi/*.pyc
+backend-fastapi/.env
+backend-fastapi/uploads/
+backend-fastapi/.venv/
+backend-fastapi/venv/
+backend-fastapi/.pytest_cache/
+
+# --- frontend (Angular) ---
+frontend/dist/
+frontend/node_modules/
+frontend/.angular/cache/
+frontend/npm-debug.log
+frontend/yarn-error.log
+frontend/coverage/

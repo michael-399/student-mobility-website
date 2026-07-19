@@ -1,0 +1,45 @@
+<!-- login.html — Login page template.
+     Renders a centered login card with email/password fields,
+     conditional error display, and a submit button that shows
+     a loading state while the authentication request is in flight. -->
+
+<div class="login-container">
+  <div class="login-card">
+    <h1>Student Mobility</h1>
+    <h2>Login</h2>
+
+    <!-- Conditionally display the error message when authentication fails. -->
+    @if (error) {
+      <div class="error">{{ error }}</div>
+    }
+
+    <!-- Template-driven form; ngSubmit calls the component's submit() method. -->
+    <form (ngSubmit)="submit()">
+      <label for="email">Email</label>
+      <input
+        id="email"
+        type="email"
+        [(ngModel)]="email"
+        name="email"
+        placeholder="your@email.com"
+        autocomplete="email"
+      />
+
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        [(ngModel)]="password"
+        name="password"
+        placeholder="password"
+        autocomplete="current-password"
+      />
+
+      <!-- Button is disabled while a login request is in progress,
+           and its label changes to reflect the loading state. -->
+      <button type="submit" [disabled]="loading">
+        {{ loading ? "Signing in..." : "Sign in" }}
+      </button>
+    </form>
+  </div>
+</div>
