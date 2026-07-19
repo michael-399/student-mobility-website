@@ -20,6 +20,13 @@ backend-fastapi/.venv/
 backend-fastapi/venv/
 backend-fastapi/.pytest_cache/
 
+# --- services/database (Python) ---
+services/**/__pycache__/
+services/**/*.pyc
+*.env
+.env.*
+!.env.example
+
 # --- frontend (Angular) ---
 frontend/dist/
 frontend/node_modules/
