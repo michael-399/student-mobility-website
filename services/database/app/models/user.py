@@ -1,0 +1,40 @@
+import enum
+from ..database import db
+
+class UserRole(enum.Enum):
+    STUDENT = "student"
+    ADMIN = "admin"
+    TEACHER = "teacher"
+
+class USER_ACCOUNT(db.Model):
+    __tablename__ = "User_Account"
+
+    user_id = db.Column(
+        db.BigInteger,
+        primary_key=True,
+    )
+
+    email = db.Column(
+        db.String(255),
+        nullable=False,
+    )
+
+    password_hash = db.Column(
+        db.Text,
+        nullable=False,
+    )
+
+    first_name = db.Column(
+        db.String(50),
+        nullable=False,
+    )
+
+    last_name = db.Column(
+        db.String(50),
+        nullable=False,
+    )
+
+    user_role = db.Column(
+        db.Enum(UserRole),
+        nullable=False, 
+    )

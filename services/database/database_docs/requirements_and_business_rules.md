@@ -117,6 +117,16 @@ initial set of statuses is:
 Business rules describe conditions that must always remain true. The enforcement
 mechanism will be chosen during logical design.
 
+### Authentication security
+
+- BR-00A: Plaintext passwords shall never be stored or logged.
+- BR-00B: Passwords shall be hashed using Argon2id with a unique random salt for
+  each password.
+- BR-00C: Only the encoded password hash, which includes the salt and algorithm
+  parameters, shall be stored in the user record.
+- BR-00D: Password verification shall be performed by the password-hashing
+  library in Python, not through direct string comparison or PostgreSQL logic.
+
 ### Users and ownership
 
 - BR-01: Every user shall have exactly one system role.
@@ -205,4 +215,3 @@ the logical schema is finalized:
 5. Can office staff reopen a closed application?
 6. Should partner institutions be deleted or only deactivated when already used?
 7. Should status history and decision history be retained for auditing?
-
