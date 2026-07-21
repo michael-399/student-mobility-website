@@ -44,4 +44,11 @@ class Institution(db.Model):
         ),
 
     )
+
+    applications = db.relationship(
+        "MobilityApplication",
+        back_populates="host_institution",
+    )    
+    
+
     

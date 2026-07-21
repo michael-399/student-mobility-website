@@ -3,11 +3,11 @@ from ..database import db
 
 class UserRole(enum.Enum):
     STUDENT = "student"
-    ADMIN = "admin"
-    TEACHER = "teacher"
+    COORDINATOR = "coordinator"
+    OFFICE_STAFF = "office_staff"
 
 class USER_ACCOUNT(db.Model):
-    __tablename__ = "User_Account"
+    __tablename__ = "user_account"
 
     user_id = db.Column(
         db.BigInteger,
@@ -17,6 +17,7 @@ class USER_ACCOUNT(db.Model):
     email = db.Column(
         db.String(255),
         nullable=False,
+        unique=True,
     )
 
     password_hash = db.Column(
@@ -35,6 +36,20 @@ class USER_ACCOUNT(db.Model):
     )
 
     user_role = db.Column(
-        db.Enum(UserRole),
+        db.Enum(UserRole, 
+                name="user_role"),
         nullable=False, 
     )
+
+    student_applications = db.relationship(
+        "MobilityApplication",
+        foreign_keys="MobilityApplication.student_id",
+        back_populates="student",
+    )
+
+    coordinated_applications = db.relationship(
+        "MobilityApplication",
+        foreign_keys="MobilityApplication.coordinator_id",
+        back_populates="coordinator",
+    )
+    
