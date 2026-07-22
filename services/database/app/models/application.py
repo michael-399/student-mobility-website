@@ -7,6 +7,8 @@ class MobilityPeriod(enum.Enum):
     FIRST_SEMESTER = "first_semester"
     SECOND_SEMESTER = "second_semester"
     FULL_YEAR = "full_year"
+
+
 class MobilityApplication(db.Model):
     __tablename__ = "mobility_application"
 
@@ -33,7 +35,7 @@ class MobilityApplication(db.Model):
     host_institution_id = db.Column(
         db.BigInteger,
         db.ForeignKey(
-            "Institution.institution_id",
+            "institution.institution_id",
             ondelete="RESTRICT",
         ),
         nullable=False,
@@ -58,6 +60,7 @@ class MobilityApplication(db.Model):
         foreign_keys=[coordinator_id],
         back_populates="coordinated_applications",
     )
+
     student_id = db.Column(
         db.BigInteger,
         db.ForeignKey(
@@ -70,6 +73,10 @@ class MobilityApplication(db.Model):
         "UserAccount",
         foreign_keys=[student_id],
         back_populates="student_applications",
-
     )
-  
+
+    exam_plan_versions = db.relationship(
+        "ExamPlanVersion",
+        back_populates="application",
+        cascade="all, delete-orphan",
+    )

@@ -1,8 +1,10 @@
 """SQLAlchemy models for partner host institutions."""
-from ..database import db 
+
+from ..database import db
+
 
 class Institution(db.Model):
-    __tablename__ = "Institution"
+    __tablename__ = "institution"
 
     institution_id = db.Column(
         db.BigInteger,
@@ -42,13 +44,9 @@ class Institution(db.Model):
             "city",
             name="uq_host_institution_location",
         ),
-
     )
 
     applications = db.relationship(
         "MobilityApplication",
         back_populates="host_institution",
-    )    
-    
-
-    
+    )

@@ -132,3 +132,11 @@ Initial `APPLICATION_STATUS` values:
 The `student_id` and `coordinator_id` foreign keys both reference
 `USER_ACCOUNT.user_id`. Additional database or application rules must ensure that
 the referenced users have the `student` and `coordinator` roles respectively.
+
+## EXAM_MAPPING
+
+Attributes: 
+- application_id
+- foreign_course
+- home_course
+- credits 

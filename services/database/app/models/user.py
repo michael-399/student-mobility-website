@@ -1,12 +1,15 @@
 import enum
+
 from ..database import db
+
 
 class UserRole(enum.Enum):
     STUDENT = "student"
     COORDINATOR = "coordinator"
     OFFICE_STAFF = "office_staff"
 
-class USER_ACCOUNT(db.Model):
+
+class UserAccount(db.Model):
     __tablename__ = "user_account"
 
     user_id = db.Column(
@@ -36,9 +39,8 @@ class USER_ACCOUNT(db.Model):
     )
 
     user_role = db.Column(
-        db.Enum(UserRole, 
-                name="user_role"),
-        nullable=False, 
+        db.Enum(UserRole, name="user_role"),
+        nullable=False,
     )
 
     student_applications = db.relationship(
@@ -50,6 +52,5 @@ class USER_ACCOUNT(db.Model):
     coordinated_applications = db.relationship(
         "MobilityApplication",
         foreign_keys="MobilityApplication.coordinator_id",
-        back_populates="coordinator",
+        back_populates="academic_coordinator",
     )
-    
