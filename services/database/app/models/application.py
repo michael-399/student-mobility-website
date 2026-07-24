@@ -75,8 +75,8 @@ class MobilityApplication(db.Model):
         back_populates="student_applications",
     )
 
-    exam_plan_versions = db.relationship(
-        "ExamPlanVersion",
+    learning_agreements = db.relationship(
+        "LearningAgreement",
         back_populates="application",
         cascade="all, delete-orphan",
     )

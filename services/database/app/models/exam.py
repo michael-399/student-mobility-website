@@ -1,4 +1,4 @@
-"""SQLAlchemy models for course mappings, exam results, and recognition."""
+"""SQLAlchemy models for Learning Agreements and their course mappings."""
 
 import enum
 
@@ -11,8 +11,8 @@ class ApprovalStatus(enum.Enum):
     REJECTED = "rejected"
 
 
-class ExamPlanVersion(db.Model):
-    __tablename__ = "exam_plan_version"
+class LearningAgreement(db.Model):
+    __tablename__ = "learning_agreement"
 
     application_id = db.Column(
         db.BigInteger,
@@ -26,6 +26,17 @@ class ExamPlanVersion(db.Model):
     version_number = db.Column(
         db.Integer,
         primary_key=True,
+    )
+
+    file_path = db.Column(
+        db.Text,
+        nullable=False,
+    )
+
+    uploaded_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=db.func.now(),
     )
 
     approval_status = db.Column(
@@ -52,13 +63,20 @@ class ExamPlanVersion(db.Model):
 
     application = db.relationship(
         "MobilityApplication",
-        back_populates="exam_plan_versions",
+        back_populates="learning_agreements",
     )
 
     course_mappings = db.relationship(
         "CourseMapping",
-        back_populates="plan_version",
+        back_populates="learning_agreement",
         cascade="all, delete-orphan",
+    )
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "version_number > 0",
+            name="ck_learning_agreement_version_positive",
+        ),
     )
 
 
@@ -110,8 +128,8 @@ class CourseMapping(db.Model):
         nullable=False,
     )
 
-    plan_version = db.relationship(
-        "ExamPlanVersion",
+    learning_agreement = db.relationship(
+        "LearningAgreement",
         back_populates="course_mappings",
     )
 
@@ -119,11 +137,11 @@ class CourseMapping(db.Model):
         db.ForeignKeyConstraint(
             ["application_id", "version_number"],
             [
-                "exam_plan_version.application_id",
-                "exam_plan_version.version_number",
+                "learning_agreement.application_id",
+                "learning_agreement.version_number",
             ],
             ondelete="CASCADE",
-            name="fk_course_mapping_plan_version",
+            name="fk_course_mapping_learning_agreement",
         ),
         db.CheckConstraint(
             "home_course_credits > 0",

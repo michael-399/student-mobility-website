@@ -133,10 +133,100 @@ The `student_id` and `coordinator_id` foreign keys both reference
 `USER_ACCOUNT.user_id`. Additional database or application rules must ensure that
 the referenced users have the `student` and `coordinator` roles respectively.
 
-## EXAM_MAPPING
+## LearningAgreement
 
-Attributes: 
-- application_id
-- foreign_course
-- home_course
-- credits 
+Represents one uploaded Learning Agreement and the exam plan contained in that
+version. A new version is created when the student proposes a modification.
+Keeping old versions ensures that rejecting a modification does not overwrite
+the previously approved agreement and mappings.
+
+Attributes:
+
+- mobility application
+- version number
+- uploaded file path
+- upload timestamp
+- approval status
+- decision date
+- rejection reason
+
+Relationships:
+
+- One mobility application can have many Learning Agreement versions.
+- Each Learning Agreement belongs to exactly one mobility application.
+- One Learning Agreement version contains one or more course mappings.
+
+## LEARNING_AGREEMENT
+
+| Attribute | Preliminary type | Constraints |
+|---|---|---|
+| `application_id` | `BIGINT` | Composite primary key; foreign key to `MOBILITY_APPLICATION.application_id`; not null; delete cascades |
+| `version_number` | `INTEGER` | Composite primary key; positive integer |
+| `file_path` | `TEXT` | Not null |
+| `uploaded_at` | `TIMESTAMP WITH TIME ZONE` | Not null, defaults to current time |
+| `approval_status` | `APPROVAL_STATUS` | Not null, default `pending` |
+| `decision_date` | `DATE` | Optional while pending; required after a decision |
+| `rejection_reason` | `TEXT` | Required when rejected; otherwise optional |
+
+The pair `(application_id, version_number)` uniquely identifies a Learning
+Agreement version. Version numbers therefore restart at `1` for each mobility
+application.
+
+Allowed `APPROVAL_STATUS` values:
+
+- `pending`
+- `approved`
+- `rejected`
+
+Decision consistency rules:
+
+- A pending version must not have a decision date.
+- An approved or rejected version must have a decision date.
+- A rejected version must have a non-empty rejection reason.
+
+## CourseMapping
+
+Represents the association between one foreign course and one Ca' Foscari home
+course within a specific Learning Agreement version. Different agreement
+versions may contain different numbers of mappings.
+
+Attributes:
+
+- mapping identifier
+- Learning Agreement version
+- foreign course code
+- foreign course name
+- foreign course credits
+- home course code
+- home course name
+- home course credits
+
+Relationships:
+
+- One Learning Agreement version can contain many course mappings.
+- Each course mapping belongs to exactly one Learning Agreement version.
+
+## COURSE_MAPPING
+
+| Attribute | Preliminary type | Constraints |
+|---|---|---|
+| `mapping_id` | `BIGINT` | Primary key |
+| `application_id` | `BIGINT` | Composite foreign key to `LEARNING_AGREEMENT`; not null |
+| `version_number` | `INTEGER` | Composite foreign key to `LEARNING_AGREEMENT`; not null |
+| `foreign_course_code` | `VARCHAR(50)` | Not null |
+| `foreign_course_name` | `VARCHAR(255)` | Not null |
+| `foreign_course_credits` | `NUMERIC(4,1)` | Not null, greater than zero |
+| `home_course_code` | `VARCHAR(50)` | Not null |
+| `home_course_name` | `VARCHAR(255)` | Not null |
+| `home_course_credits` | `NUMERIC(4,1)` | Not null, greater than zero |
+
+The pair `(application_id, version_number)` is a composite foreign key to
+`LEARNING_AGREEMENT(application_id, version_number)`. Deleting a Learning
+Agreement version cascades to its mappings because a mapping has no meaning
+without its agreement.
+
+The combination `(application_id, version_number, home_course_code,
+foreign_course_code)` must be unique, preventing the same course pair from being
+entered twice in one plan version. The two credit values are stored separately
+because the project brief requires both and does not state that they must be
+equal.
