@@ -121,7 +121,7 @@ mechanism will be chosen during logical design.
 
 - BR-00A: Plaintext passwords shall never be stored or logged.
 - BR-00B: Passwords shall be hashed using Argon2id with a unique random salt for
-  each password.
+  each password. (we do not need a seperate salt column because Argon2id stores it inside the encoded password hash)
 - BR-00C: Only the encoded password hash, which includes the salt and algorithm
   parameters, shall be stored in the user record.
 - BR-00D: Password verification shall be performed by the password-hashing

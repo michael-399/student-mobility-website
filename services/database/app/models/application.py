@@ -2,7 +2,13 @@
 import enum
 
 from ..database import db
-
+class ApplicationStatus(enum.Enum):
+    CREATED = "created"
+    WAITING_LA_APPROVAL = "waiting_la_approval"
+    PRE_DEPARTURE_COMPLETED = "pre_departure_completed"
+    MOBILITY_IN_PROGRESS = "mobility_in_progress"
+    UNDER_EXAM_RECOGNITION = "under_exam_recognition"
+    CLOSED = "closed"
 class MobilityPeriod(enum.Enum):
     FIRST_SEMESTER = "first_semester"
     SECOND_SEMESTER = "second_semester"
@@ -39,6 +45,16 @@ class MobilityApplication(db.Model):
             ondelete="RESTRICT",
         ),
         nullable=False,
+    )
+    status = db.Column(
+        db.Enum(ApplicationStatus,
+                name="application_status",
+                values_callable=lambda enum_class: [
+                    member.value for member in enum_class   
+                ]),
+            nullable=False,
+            default=ApplicationStatus.CREATED,
+            server_default="created",
     )
 
     host_institution = db.relationship(
