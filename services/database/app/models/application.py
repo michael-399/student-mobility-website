@@ -96,3 +96,10 @@ class MobilityApplication(db.Model):
         back_populates="application",
         cascade="all, delete-orphan",
     )
+
+    transcript = db.relationship(
+        "TranscriptOfRecords",
+        back_populates="application",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
