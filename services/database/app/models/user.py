@@ -39,7 +39,12 @@ class UserAccount(db.Model):
     )
 
     user_role = db.Column(
-        db.Enum(UserRole, name="user_role"),
+        db.Enum(
+            UserRole,
+            name="user_role",
+            values_callable=lambda enum_class: [
+                member.value for member in enum_class
+            ]),
         nullable=False,
     )
 

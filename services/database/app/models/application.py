@@ -33,8 +33,13 @@ class MobilityApplication(db.Model):
     )
 
     expected_mobility_period = db.Column(
-        db.Enum(MobilityPeriod,
-                name="mobility_period"),
+        db.Enum(
+            MobilityPeriod,
+            name="mobility_period",
+            values_callable=lambda enum_class: [
+                member.value for member in enum_class
+            ],
+        ),
         nullable=False,
     )
 
@@ -50,8 +55,9 @@ class MobilityApplication(db.Model):
         db.Enum(ApplicationStatus,
                 name="application_status",
                 values_callable=lambda enum_class: [
-                    member.value for member in enum_class   
-                ]),
+                    member.value for member in enum_class 
+                ],
+            ),
             nullable=False,
             default=ApplicationStatus.CREATED,
             server_default="created",
@@ -102,4 +108,25 @@ class MobilityApplication(db.Model):
         back_populates="application",
         cascade="all, delete-orphan",
         uselist=False,
+    )
+
+    actual_arrival_date = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    actual_departure_date = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    __table_args__ = (
+        db.CheckConstraint(
+            (
+                "actual_departure_date IS NULL "
+                "OR (actual_arrival_date IS NOT NULL "
+                "AND actual_departure_date >= actual_arrival_date)"
+            ),
+            name="ck_mobility_application_actual_dates",
+        ),
     )

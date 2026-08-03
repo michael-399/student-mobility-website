@@ -28,13 +28,14 @@ class Institution(db.Model):
 
     contact_email = db.Column(
         db.String(255),
-        nullable=False,
+        nullable=True,
     )
 
     is_active = db.Column(
         db.Boolean,
         nullable=False,
         default=True,
+        server_default=db.true(),
     )
 
     __table_args__ = (
