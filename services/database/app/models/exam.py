@@ -11,6 +11,12 @@ class ApprovalStatus(enum.Enum):
     REJECTED = "rejected"
 
 
+class RecognitionStatus(enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class LearningAgreement(db.Model):
     __tablename__ = "learning_agreement"
 
@@ -133,6 +139,13 @@ class CourseMapping(db.Model):
         back_populates="course_mappings",
     )
 
+    exam_result = db.relationship(
+        "ExamResult",
+        back_populates="course_mapping",
+        cascade="all, delete-orphan",
+        uselist=False,
+    )
+
     __table_args__ = (
         db.ForeignKeyConstraint(
             ["application_id", "version_number"],
@@ -158,4 +171,61 @@ class CourseMapping(db.Model):
             "foreign_course_code",
             name="uq_course_mapping_plan_course_pair",
         ),
+    )
+
+
+class ExamResult(db.Model):
+    __tablename__ = "exam_result"
+
+    result_id = db.Column(
+        db.BigInteger,
+        primary_key=True,
+    )
+
+    mapping_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey(
+            "course_mapping.mapping_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+        unique=True,
+    )
+
+    foreign_grade = db.Column(
+        db.String(50),
+        nullable=False,
+    )
+
+    exam_date = db.Column(
+        db.Date,
+        nullable=False,
+    )
+
+    recognition_status = db.Column(
+        db.Enum(
+            RecognitionStatus,
+            name="recognition_status",
+            values_callable=lambda enum_class: [
+                member.value for member in enum_class
+            ],
+        ),
+        nullable=False,
+        default=RecognitionStatus.PENDING,
+        server_default="pending",
+    )
+
+    decision_date = db.Column(
+        db.Date,
+        nullable=True,
+    )
+
+    rejection_reason = db.Column(
+        db.Text,
+        nullable=True,
+    )
+
+    course_mapping = db.relationship(
+        "CourseMapping",
+        back_populates="exam_result",
     )

@@ -2,6 +2,7 @@
 import enum
 
 from ..database import db
+
 class ApplicationStatus(enum.Enum):
     CREATED = "created"
     WAITING_LA_APPROVAL = "waiting_la_approval"
@@ -9,6 +10,8 @@ class ApplicationStatus(enum.Enum):
     MOBILITY_IN_PROGRESS = "mobility_in_progress"
     UNDER_EXAM_RECOGNITION = "under_exam_recognition"
     CLOSED = "closed"
+
+
 class MobilityPeriod(enum.Enum):
     FIRST_SEMESTER = "first_semester"
     SECOND_SEMESTER = "second_semester"
@@ -129,4 +132,52 @@ class MobilityApplication(db.Model):
             ),
             name="ck_mobility_application_actual_dates",
         ),
+    )
+
+
+class ApplicationStatusHistory(db.Model):
+    __tablename__ = "application_status_history"
+
+    history_id = db.Column(
+        db.BigInteger,
+        primary_key=True,
+    )
+
+    application_id = db.Column(
+        db.BigInteger,
+        db.ForeignKey(
+            "mobility_application.application_id",
+            ondelete="CASCADE",
+        ),
+        nullable=False,
+    )
+
+    old_status = db.Column(
+        db.Enum(
+            ApplicationStatus,
+            name="application_status",
+            create_type=False,
+            values_callable=lambda enum_class: [
+                member.value for member in enum_class
+            ],
+        ),
+        nullable=True,
+    )
+
+    new_status = db.Column(
+        db.Enum(
+            ApplicationStatus,
+            name="application_status",
+            create_type=False,
+            values_callable=lambda enum_class: [
+                member.value for member in enum_class
+            ],
+        ),
+        nullable=False,
+    )
+
+    changed_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        server_default=db.func.now(),
     )
