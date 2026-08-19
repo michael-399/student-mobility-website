@@ -83,6 +83,28 @@ class LearningAgreement(db.Model):
             "version_number > 0",
             name="ck_learning_agreement_version_positive",
         ),
+        db.CheckConstraint(
+            """
+            (
+                approval_status = 'pending'
+                AND decision_date IS NULL
+                AND rejection_reason IS NULL
+            )
+            OR
+            (
+                approval_status = 'approved'
+                AND decision_date IS NOT NULL
+                AND rejection_reason IS NULL
+            )
+            OR
+            (
+                approval_status = 'rejected'
+                AND decision_date IS NOT NULL
+                AND rejection_reason IS NOT NULL
+            )
+            """,
+            name="ck_learning_agreement_decision_consistency",
+        ),
     )
 
 
@@ -228,4 +250,29 @@ class ExamResult(db.Model):
     course_mapping = db.relationship(
         "CourseMapping",
         back_populates="exam_result",
+    )
+
+    __table_args__ = (
+        db.CheckConstraint(
+            """
+            (
+                recognition_status = 'pending'
+                AND decision_date IS NULL
+                AND rejection_reason IS NULL
+            )
+            OR
+            (
+                recognition_status = 'approved'
+                AND decision_date IS NOT NULL
+                AND rejection_reason IS NULL
+            )
+            OR
+            (
+                recognition_status = 'rejected'
+                AND decision_date IS NOT NULL
+                AND rejection_reason IS NOT NULL
+            )
+            """,
+            name="ck_exam_result_decision_consistency",
+        ),
     )

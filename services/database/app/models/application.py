@@ -125,6 +125,10 @@ class MobilityApplication(db.Model):
 
     __table_args__ = (
         db.CheckConstraint(
+            "academic_year ~ '^[0-9]{4}/[0-9]{4}$'",
+            name="ck_mobility_application_academic_year_format",
+        ),
+        db.CheckConstraint(
             (
                 "actual_departure_date IS NULL "
                 "OR (actual_arrival_date IS NOT NULL "
