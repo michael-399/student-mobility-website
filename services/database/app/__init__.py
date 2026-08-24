@@ -14,7 +14,9 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
     from . import models
+    from .routes.auth import auth_bp
 
+    app.register_blueprint(auth_bp)
     @app.get("/health/database")
     def database_health():
         try:
