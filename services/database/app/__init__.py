@@ -1,20 +1,22 @@
 from flask import Flask
-
+from flask_migrate import Migrate
 from .database import db
 from .config import Config
 
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-
+migrate = Migrate()
 
 def create_app():
     app = Flask(__name__)
 
     app.config.from_object(Config)
     db.init_app(app)
-
+    migrate.init_app(app, db)
     from . import models
+    from .routes.auth import auth_bp
 
+    app.register_blueprint(auth_bp)
     @app.get("/health/database")
     def database_health():
         try:
