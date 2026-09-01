@@ -113,6 +113,13 @@ class MobilityApplication(db.Model):
         uselist=False,
     )
 
+    status_history = db.relationship(
+        "ApplicationStatusHistory",
+        back_populates="application",
+        cascade="all, delete-orphan",
+        order_by="ApplicationStatusHistory.changed_at",
+    )
+
     actual_arrival_date = db.Column(
         db.Date,
         nullable=True,
@@ -184,4 +191,9 @@ class ApplicationStatusHistory(db.Model):
         db.DateTime(timezone=True),
         nullable=False,
         server_default=db.func.now(),
+    )
+
+    application = db.relationship(
+        "MobilityApplication",
+        back_populates="status_history",
     )

@@ -44,16 +44,10 @@ export class LoginComponent {
     // Call the auth service; on success, route the user to their
     // role-specific dashboard. On failure, show the server error.
     this.auth.login(this.email, this.password).subscribe({
-      next: (res) => {
+      next: () => {
         this.loading = false;
         // Role-based redirect after successful login.
-        if (res.user.role === "student") {
-          this.router.navigate(["/student/dashboard"]);
-        } else if (res.user.role === "lecturer") {
-          this.router.navigate(["/lecturer/dashboard"]);
-        } else {
-          this.router.navigate(["/office/dashboard"]);
-        }
+        this.router.navigateByUrl(this.auth.homePath());
       },
       error: (err) => {
         this.loading = false;

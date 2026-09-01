@@ -1,32 +1,29 @@
-// auth.interceptor.ts — Functional HTTP interceptor that attaches a
-// Bearer token to every outgoing request (when available) and handles
-// 401 responses by clearing stored auth data and redirecting to login.
+// auth.interceptor.ts — Sends the session cookie with every API call and
+// handles the server rejecting it.
+//
+// There is no token to attach: authentication is an HttpOnly cookie the
+// browser holds. What this must do is set `withCredentials`, which is
+// what makes the browser include that cookie at all once the API is on a
+// different origin.
 
 import { HttpInterceptorFn, HttpErrorResponse } from "@angular/common/http";
 import { catchError, throwError } from "rxjs";
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  // Read the JWT token from localStorage (set by AuthService on login).
-  const token = localStorage.getItem("token");
-  if (token) {
-    // Clone the request and attach the Authorization header.
-    const cloned = req.clone({
-      setHeaders: { Authorization: `Bearer ${token}` },
-    });
-    return next(cloned).pipe(
-      catchError((err: HttpErrorResponse) => {
-        // If the server responds with 401 for a non-login request,
-        // the token is expired/invalid — clear storage and redirect.
-        if (err.status === 401 && !req.url.includes("/auth/login")) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          window.location.href = "/login";
-        }
-        // Re-throw the error so callers (e.g. components) can handle it.
-        return throwError(() => err);
-      })
-    );
-  }
-  // No token available — forward the request unchanged.
-  return next(req);
+  const withSession = req.clone({ withCredentials: true });
+
+  return next(withSession).pipe(
+    catchError((err: HttpErrorResponse) => {
+      // A 401 means the session is gone or was never established. Drop the
+      // cached user and send them to sign in again -- except on the login
+      // call itself, where a 401 is just wrong credentials and the form
+      // should show the message.
+      if (err.status === 401 && !req.url.includes("/api/login")) {
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
+
+      return throwError(() => err);
+    })
+  );
 };

@@ -1,205 +1,196 @@
-<!-- Office Application Detail Template -->
-<!-- Read-only view of a single application for office staff, plus administrative -->
-<!-- actions: mark as in progress and close the application. -->
-<a routerLink="/office/dashboard" class="back">&larr; Back</a>
+<div class="page-header">
+  <h1>Application</h1>
+  <a routerLink="/office/dashboard" class="btn">Back</a>
+</div>
 
-<!-- Loading state while the API request is in flight -->
-@if (loading) {
-  <p class="muted">Loading...</p>
-}
-
-<!-- Error state when the application could not be fetched -->
 @if (error) {
   <p class="error">{{ error }}</p>
 }
 
-<!-- Main content: only rendered when the application is loaded -->
-@if (app && !loading) {
-  <h2>Application Detail</h2>
-
-  <!-- Key-value info block for application metadata -->
-  <div class="info">
-    <div class="info-row">
-      <span class="label">Student</span>
-      <!-- Student name and email; fall back to em-dash if the populated object is missing -->
-      <span>{{ app.studentId?.name ?? "—" }} ({{ app.studentId?.email ?? "—" }})</span>
+@if (loading) {
+  <p>Loading…</p>
+} @else if (app) {
+  <section class="card">
+    <div class="card-head">
+      <h2>{{ app.student.first_name }} {{ app.student.last_name }}</h2>
+      <span class="badge status-{{ app.status }}">{{ statusLabel[app.status] }}</span>
     </div>
-    <div class="info-row">
-      <span class="label">Academic Year</span>
-      <span>{{ app.academicYear }}</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Host Institution</span>
-      <!-- Host may be a populated object or a raw ID -->
-      <span>{{ app.hostInstitutionId?.name ?? app.hostInstitutionId }}</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Referent Lecturer</span>
-      <!-- Lecturer name (only shown in office view) -->
-      <span>{{ app.referentLecturerId?.name ?? app.referentLecturerId }}</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Expected Period</span>
-      <span>{{ periodLabel[app.expectedPeriod] ?? app.expectedPeriod }}</span>
-    </div>
-    <div class="info-row">
-      <span class="label">Status</span>
-      <!-- Status badge with dynamic CSS class for colour -->
-      <span [class]="'badge ' + app.status">{{ statusLabel[app.status] ?? app.status }}</span>
-    </div>
-    <!-- Conditionally show arrival/departure dates if they exist -->
-    @if (app.actualArrivalDate) {
-      <div class="info-row">
-        <span class="label">Actual Arrival</span>
-        <span>{{ app.actualArrivalDate | date:"mediumDate" }}</span>
-      </div>
-    }
-    @if (app.actualDepartureDate) {
-      <div class="info-row">
-        <span class="label">Actual Departure</span>
-        <span>{{ app.actualDepartureDate | date:"mediumDate" }}</span>
-      </div>
-    }
-  </div>
-
-  <!-- Learning Agreements section (read-only for office) -->
-  <h3>Learning Agreements</h3>
-  @if (app.learningAgreements.length === 0) {
-    <p class="muted">No learning agreements uploaded.</p>
-  }
-  <!-- List each LA with download link, status, decision date, and reason -->
-  @for (la of app.learningAgreements; track $index) {
-    <div class="la-row">
-      <span>{{ la.fileName }}</span>
-      <span [class]="'badge ' + la.status">{{ la.status }}</span>
-      <button (click)="downloadLA($index)" class="btn-link">Download</button>
-      @if (la.decisionDate) {
-        <span class="decision-date">on {{ la.decisionDate | date:"short" }}</span>
+    <dl class="details">
+      <dt>Academic Year</dt><dd>{{ app.academic_year }}</dd>
+      <dt>Host Institution</dt>
+      <dd>{{ app.host_institution.name }} — {{ app.host_institution.city }}, {{ app.host_institution.country }}</dd>
+      <dt>Period</dt><dd>{{ periodLabel[app.expected_mobility_period] }}</dd>
+      <dt>Student</dt><dd>{{ app.student.email }}</dd>
+      <dt>Coordinator</dt>
+      <dd>{{ app.academic_coordinator.first_name }} {{ app.academic_coordinator.last_name }} ({{ app.academic_coordinator.email }})</dd>
+      @if (app.optional_note) {
+        <dt>Notes</dt><dd>{{ app.optional_note }}</dd>
       }
-      @if (la.reason) {
-        <span class="reason">{{ la.reason }}</span>
+      @if (app.actual_arrival_date) {
+        <dt>Mobility</dt>
+        <dd>
+          {{ app.actual_arrival_date | date: "mediumDate" }}
+          @if (app.actual_departure_date) {
+            – {{ app.actual_departure_date | date: "mediumDate" }}
+          }
+        </dd>
       }
-    </div>
-  }
+    </dl>
+  </section>
 
-  <!-- Exam Mappings table: shows course equivalences between home and host institutions -->
-  <h3>Exam Mappings</h3>
-  @if (app.examMappings.length === 0) {
-    <p class="muted">No exam mappings.</p>
-  } @else {
-    <table>
-      <thead>
-        <!-- Two-row header: first row groups columns by institution -->
-        <tr>
-          <th colspan="3">Home Institution</th>
-          <th colspan="3">Host Institution</th>
-        </tr>
-        <tr>
-          <th>Code</th>
-          <th>Course</th>
-          <th>Credits</th>
-          <th>Code</th>
-          <th>Course</th>
-          <th>Credits</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (m of app.examMappings; track $index) {
-          <tr>
-            <td>{{ m.localCourseCode }}</td>
-            <td>{{ m.localCourseName }}</td>
-            <td>{{ m.localCredits }}</td>
-            <td>{{ m.foreignTeachingCode }}</td>
-            <td>{{ m.foreignCourseName }}</td>
-            <td>{{ m.foreignCredits }}</td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  }
+  <!-- Administrative actions ---------------------------------------------- -->
+  <section class="card">
+    <h2>Actions</h2>
 
-  <!-- Modifications History: read-only listing for office view -->
-  @if (app.modifications.length > 0) {
-    <h3>Modifications History</h3>
-    @for (mod of app.modifications; track $index) {
-      <div class="mod-row">
-        <div class="mod-header">
-          <span>Submitted {{ mod.createdAt | date:"short" }}</span>
-          <span [class]="'badge ' + mod.status">{{ mod.status }}</span>
-        </div>
-        <p class="mod-desc">{{ mod.description }}</p>
-
-        <!-- Show the proposed exam mappings from the modification -->
-        @if (mod.examMappingDiff && mod.examMappingDiff.length > 0) {
-          <div class="mapping-compare">
-            <strong>Proposed Exam Mappings</strong>
-            <table class="mini-table">
-              <thead>
-                <tr><th>Local</th><th>Foreign</th></tr>
-              </thead>
-              <tbody>
-                @for (m of mod.examMappingDiff; track $index) {
-                  <tr>
-                    <td>{{ m.localCourseCode }} — {{ m.localCourseName }} ({{ m.localCredits }}ECTS)</td>
-                    <td>{{ m.foreignTeachingCode }} — {{ m.foreignCourseName }} ({{ m.foreignCredits }}ECTS)</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
-          </div>
-        }
-
-        @if (mod.decisionDate) {
-          <span class="decision-date">Evaluated on {{ mod.decisionDate | date:"short" }}</span>
-        }
-        @if (mod.reason) {
-          <span class="reason">Reason: {{ mod.reason }}</span>
-        }
-      </div>
-    }
-  }
-
-  <!-- Exam Scores: read-only table for office view -->
-  @if (app.examScores.length > 0) {
-    <h3>Exam Scores</h3>
-    <table>
-      <thead>
-        <tr>
-          <th>Exam</th>
-          <th>Grade</th>
-          <th>Date</th>
-          <th>Status</th>
-          <!-- No actions column - office cannot approve scores -->
-        </tr>
-      </thead>
-      <tbody>
-        @for (score of app.examScores; track $index) {
-          <tr>
-            <!-- Resolve exam name from the examMappings array using helper method -->
-            <td>{{ getExamName(score.examMappingIndex) }}</td>
-            <td>{{ score.score }}</td>
-            <!-- Show exam date if available, otherwise em-dash -->
-            <td>{{ score.examDate ? (score.examDate | date:"mediumDate") : "—" }}</td>
-            <td><span [class]="'badge ' + score.status">{{ score.status }}</span></td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  }
-
-  <!-- Administrative actions section at the bottom -->
-  <div class="actions">
-    <!-- Only show "Mark as In Progress" when the application is pre-departure done -->
-    @if (app.status === "preDepartureDone") {
-      <button class="btn-action" (click)="markInProgress()">Approve</button>
-    }
-    <!-- Only show "Close Application" when scores are awaiting approval -->
-    @if (app.status === "torUploaded") {
-      <button class="btn-action btn-close" (click)="closeApplication()">Close Application</button>
-    }
-    <!-- Feedback message shown after any administrative action -->
     @if (actionMsg) {
-      <span class="msg">{{ actionMsg }}</span>
+      <p class="msg">{{ actionMsg }}</p>
     }
-  </div>
+
+    @if (app.status === "closed") {
+      <p class="notice">This application is closed and can no longer be modified.</p>
+    } @else {
+      <div class="actions-row">
+        @if (canCompletePreDeparture()) {
+          <button class="btn btn-primary" (click)="completePreDeparture()">
+            Complete Pre-departure Check
+          </button>
+        } @else if (app.status === "waiting_la_approval") {
+          <p class="hint">Waiting for the coordinator to approve a Learning Agreement.</p>
+        }
+
+        @if (canClose()) {
+          <button class="btn btn-danger" (click)="closeApplication()">Close Application</button>
+        } @else if (closeBlockedReason) {
+          <p class="hint">{{ closeBlockedReason }}</p>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- Learning Agreements -------------------------------------------------- -->
+  <section class="card">
+    <h2>Learning Agreements</h2>
+
+    @if (agreements.length === 0) {
+      <p class="empty">None submitted.</p>
+    } @else {
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Uploaded</th>
+            <th>Status</th>
+            <th>Decided</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (agreement of agreements; track agreement.version_number) {
+            <tr>
+              <td>v{{ agreement.version_number }}</td>
+              <td>{{ agreement.uploaded_at | date: "medium" }}</td>
+              <td>
+                <span class="badge approval-{{ agreement.approval_status }}">
+                  {{ approvalLabel[agreement.approval_status] }}
+                </span>
+              </td>
+              <td>{{ agreement.decision_date ? (agreement.decision_date | date: "mediumDate") : "—" }}</td>
+              <td>
+                <button class="btn btn-sm" (click)="downloadAgreement(agreement.version_number)">
+                  Download
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    @if (currentAgreement) {
+      <h3>Mapping in Force (v{{ currentAgreement.version_number }})</h3>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Foreign Course</th>
+            <th>Credits</th>
+            <th>Home Course</th>
+            <th>Credits</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (mapping of currentAgreement.course_mappings; track mapping.mapping_id) {
+            <tr>
+              <td>{{ mapping.foreign_course_code }} — {{ mapping.foreign_course_name }}</td>
+              <td>{{ mapping.foreign_course_credits }}</td>
+              <td>{{ mapping.home_course_code }} — {{ mapping.home_course_name }}</td>
+              <td>{{ mapping.home_course_credits }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </section>
+
+  <!-- Recognition ---------------------------------------------------------- -->
+  @if (app.transcript) {
+    <section class="card">
+      <h2>Exam Recognition</h2>
+      <p>
+        Transcript uploaded {{ app.transcript.uploaded_at | date: "medium" }}
+        <button class="btn btn-sm" (click)="downloadTranscript()">Download</button>
+      </p>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Course</th>
+            <th>Grade</th>
+            <th>Exam Date</th>
+            <th>Status</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (mapping of recognitionMappings; track mapping.mapping_id) {
+            <tr>
+              <td>{{ mapping.foreign_course_name }} → {{ mapping.home_course_name }}</td>
+              <td>{{ mapping.exam_result?.foreign_grade ?? "—" }}</td>
+              <td>
+                {{ mapping.exam_result?.exam_date
+                    ? (mapping.exam_result?.exam_date | date: "mediumDate")
+                    : "—" }}
+              </td>
+              <td>
+                @if (mapping.exam_result) {
+                  <span class="badge approval-{{ mapping.exam_result.recognition_status }}">
+                    {{ approvalLabel[mapping.exam_result.recognition_status] }}
+                  </span>
+                } @else {
+                  <span class="empty">Not submitted</span>
+                }
+              </td>
+              <td>{{ mapping.exam_result?.rejection_reason ?? "" }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </section>
+  }
+
+  <!-- History -------------------------------------------------------------- -->
+  <section class="card">
+    <h2>History</h2>
+    <ul class="history">
+      @for (entry of app.status_history; track $index) {
+        <li>
+          <span class="when">{{ entry.changed_at | date: "medium" }}</span>
+          @if (entry.old_status) {
+            {{ statusLabel[entry.old_status] }} → {{ statusLabel[entry.new_status] }}
+          } @else {
+            Created
+          }
+        </li>
+      }
+    </ul>
+  </section>
 }

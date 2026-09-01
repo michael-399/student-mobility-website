@@ -1,248 +1,335 @@
-// StudentDetailComponent – full read-only + action view of a single mobility application.
-// Displays application metadata, learning agreements, exam mappings, and modification history.
-// Provides context-sensitive actions based on the current application status:
-// upload LA, set actual dates, propose modifications, mark ready for transcript, upload transcript with grades.
+// StudentDetailComponent — the full view of one application, plus every
+// action the student can take on it.
+//
+// Uploading a Learning Agreement and proposing a modification are now one
+// operation: each submission is the next version, whether it is the first
+// one, a resubmission after a rejection, or a revision during the
+// mobility. The mappings editor is therefore shared by all three cases,
+// and seeds itself from whichever version is currently in force.
 import { Component, OnInit, inject, ChangeDetectorRef } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { DatePipe } from "@angular/common";
-import { StudentService } from "../../../services/student.service";
 import { FormsModule } from "@angular/forms";
+import { StudentService, type ExamResultInput } from "../../../services/student.service";
+import { saveResponseAsFile } from "../../../services/download";
+import {
+  APPROVAL_LABEL,
+  PERIOD_LABEL,
+  STATUS_LABEL,
+  currentAgreement,
+  emptyCourseMapping,
+  isCompleteMapping,
+  pendingAgreement,
+  type ApplicationDetail,
+  type CourseMappingInput,
+  type LearningAgreement,
+} from "../../../services/models";
 
 @Component({
   selector: "app-student-detail",
   standalone: true,
   imports: [RouterLink, DatePipe, FormsModule],
   templateUrl: "./detail.html",
-  styleUrl: "./detail.css",
 })
 export class StudentDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private svc = inject(StudentService);
   private cdr = inject(ChangeDetectorRef);
 
-  // The loaded application object (null while loading)
-  app: any = null;
+  app: ApplicationDetail | null = null;
   loading = true;
   error = "";
 
-  // Learning Agreement upload state
+  // Learning Agreement submission state.
   laFile: File | null = null;
+  laMappings: CourseMappingInput[] = [];
   laMsg = "";
 
-  // Actual arrival/departure date editing state
+  // Mobility dates state.
   arrival = "";
   departure = "";
   datesMsg = "";
 
-  // Modification proposal state
-  modFile: File | null = null;
-  modDesc = "";
-  modMsg = "";
-  modExamMappings: { foreignTeachingCode: string; foreignCourseName: string; foreignCredits: number; localCourseCode: string; localCourseName: string; localCredits: number }[] = [];
+  // Transcript state.
+  transcriptFile: File | null = null;
+  transcriptMsg = "";
 
-  // Transcript of Records upload state
-  toFile: File | null = null;
-  toMsg = "";
-  // Per-exam grade entries for transcript submission
-  examScores: { examMappingIndex: number; score: string; examDate: string }[] = [];
+  // Exam results state, one row per mapping in the agreement in force.
+  examResults: ExamResultInput[] = [];
+  resultsMsg = "";
 
-  // Ready-for-transcript action feedback
-  readyMsg = "";
+  periodLabel = PERIOD_LABEL;
+  statusLabel = STATUS_LABEL;
+  approvalLabel = APPROVAL_LABEL;
 
-  // Human-readable labels for the expectedPeriod enum
-  periodLabel: Record<string, string> = {
-    first_semester: "First Semester",
-    second_semester: "Second Semester",
-    entire_year: "Entire Academic Year",
-  };
-
-  // Human-readable labels for application statuses
-  statusLabel: Record<string, string> = {
-    created: "Created",
-    awaitingLA: "Awaiting LA Approval",
-    "needs modifications": "Needs Modifications",
-    preDepartureDone: "Pre-departure Done",
-    inProgress: "Mobility in Progress",
-    torUploaded: "Waiting for Score Approval",
-    closed: "Closed",
-    canceled: "Canceled",
-  };
-
-  // Fetch application by route :id parameter
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get("id")!;
     this.svc.getById(id).subscribe({
-      next: (data) => {
-        this.app = data;
+      next: (app) => {
+        this.apply(app);
         this.loading = false;
-        // Pre-populate date inputs (strip time component for <input type="date">)
-        if (data.actualArrivalDate) this.arrival = data.actualArrivalDate.slice(0, 10);
-        if (data.actualDepartureDate) this.departure = data.actualDepartureDate.slice(0, 10);
         this.cdr.detectChanges();
       },
-      error: () => {
-        this.error = "Application not found";
+      error: (err) => {
+        this.error = err.error?.error ?? "Application not found";
         this.loading = false;
         this.cdr.detectChanges();
       },
     });
   }
 
-  // Trigger browser download of a specific Learning Agreement file by index
-  downloadLA(index: number) {
-    this.svc.downloadLA(this.app._id, index).subscribe({
-      next: (res) => {
-        const filename = this.app.learningAgreements?.[index]?.fileName ?? "learning-agreement";
-        const url = window.URL.createObjectURL(res.body!);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-      },
-      error: () => (this.laMsg = "Download failed"),
-    });
+  private apply(app: ApplicationDetail): void {
+    this.app = app;
+    // <input type="date"> needs a bare YYYY-MM-DD.
+    this.arrival = app.actual_arrival_date ?? "";
+    this.departure = app.actual_departure_date ?? "";
   }
 
-  // Capture LA file from file input
-  onLAFile(e: Event) {
-    this.laFile = (e.target as HTMLInputElement).files?.[0] ?? null;
+  // ---- Learning Agreement -------------------------------------------------
+
+  get agreements(): LearningAgreement[] {
+    return this.app?.learning_agreements ?? [];
   }
 
-  // Check if any LA is currently pending lecturer evaluation
-  hasPendingLA(): boolean {
-    return this.app?.learningAgreements?.some((la: any) => la.status === "pending") ?? false;
+  get currentAgreement(): LearningAgreement | null {
+    return currentAgreement(this.app);
   }
 
-  // Check if any modification proposal is currently pending evaluation
-  hasPendingModification(): boolean {
-    return this.app?.modifications?.some((m: any) => m.status === "pending") ?? false;
+  get pendingAgreement(): LearningAgreement | null {
+    return pendingAgreement(this.app);
   }
 
-  // Upload a new Learning Agreement (multipart)
-  uploadLA() {
-    if (!this.laFile) return;
-    this.svc.uploadLA(this.app._id, this.laFile).subscribe({
-      next: (data) => {
-        this.app = data;
-        this.laMsg = "Learning Agreement uploaded";
-        this.laFile = null;
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        this.laMsg = err.error?.error ?? "Upload failed";
-        this.cdr.detectChanges();
-      },
-    });
+  // A new version can be submitted while the application is a draft, or
+  // during the mobility as a revision -- but never while one is already
+  // awaiting a decision.
+  canSubmitAgreement(): boolean {
+    if (!this.app || this.pendingAgreement) return false;
+
+    return this.app.status === "created" || this.app.status === "mobility_in_progress";
   }
 
-  // Save actual arrival and departure dates (available during mobility)
-  saveDates() {
-    this.svc.setDates(this.app._id, { actualArrivalDate: this.arrival, actualDepartureDate: this.departure }).subscribe({
-      next: (data) => {
-        this.app = data;
-        this.datesMsg = "Dates saved";
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        this.datesMsg = err.error?.error ?? "Failed";
-        this.cdr.detectChanges();
-      },
-    });
+  // The heading changes because the same form means different things: a
+  // first submission, a corrected one, or a mid-mobility revision.
+  get agreementFormTitle(): string {
+    if (this.agreements.length === 0) return "Upload Learning Agreement";
+
+    return this.app?.status === "mobility_in_progress"
+      ? "Propose a Revised Learning Agreement"
+      : "Upload a New Learning Agreement Version";
   }
 
-  // Capture modification proposal file from file input
-  onModFile(e: Event) {
-    this.modFile = (e.target as HTMLInputElement).files?.[0] ?? null;
+  // Seeds the editor from the version in force, so a revision starts from
+  // the approved mapping rather than a blank slate.
+  startAgreement(): void {
+    const source = this.currentAgreement;
+
+    this.laMappings = source
+      ? source.course_mappings.map((mapping) => ({
+          home_course_code: mapping.home_course_code,
+          home_course_name: mapping.home_course_name,
+          home_course_credits: mapping.home_course_credits,
+          foreign_course_code: mapping.foreign_course_code,
+          foreign_course_name: mapping.foreign_course_name,
+          foreign_course_credits: mapping.foreign_course_credits,
+        }))
+      : [emptyCourseMapping()];
   }
 
-  // Populate the mod exam mapping editor from the current application mappings
-  loadModExamMappings() {
-    this.modExamMappings = this.app.examMappings.map((m: any) => ({ ...m }));
+  addMappingRow(): void {
+    this.laMappings.push(emptyCourseMapping());
   }
 
-  // Add a blank row to the modification exam mapping editor
-  addModRow() {
-    this.modExamMappings.push({ foreignTeachingCode: "", foreignCourseName: "", foreignCredits: 6, localCourseCode: "", localCourseName: "", localCredits: 6 });
+  removeMappingRow(index: number): void {
+    this.laMappings.splice(index, 1);
   }
 
-  // Remove an exam mapping row from the modification editor
-  removeModRow(i: number) {
-    if (this.modExamMappings.length > 1) {
-      this.modExamMappings.splice(i, 1);
-    }
+  onAgreementFile(event: Event): void {
+    this.laFile = (event.target as HTMLInputElement).files?.[0] ?? null;
   }
 
-  // Submit a modification proposal with the edited exam mappings
-  submitMod() {
-    if (!this.modFile || !this.modDesc) return;
-    const validMappings = this.modExamMappings.filter(
-      (m) => m.foreignTeachingCode && m.foreignCourseName && m.localCourseCode && m.localCourseName
-    );
-    if (validMappings.length === 0) return;
+  private completeMappings(): CourseMappingInput[] {
+    return this.laMappings.filter(isCompleteMapping);
+  }
+
+  canSendAgreement(): boolean {
+    return Boolean(this.laFile) && this.completeMappings().length > 0;
+  }
+
+  submitAgreement(): void {
+    if (!this.app || !this.canSendAgreement()) return;
+
     this.svc
-      .proposeModification(this.app._id, this.modFile, {
-        description: this.modDesc,
-        examMappingDiff: validMappings,
-      })
+      .submitLearningAgreement(
+        this.app.application_id,
+        this.laFile!,
+        this.completeMappings()
+      )
       .subscribe({
-        next: (data) => {
-          this.app = data;
-          this.modMsg = "Modification proposed";
-          this.modFile = null;
-          this.modDesc = "";
-          this.modExamMappings = [];
+        next: (app) => {
+          this.apply(app);
+          this.laMsg = "Learning Agreement submitted for approval";
+          this.laFile = null;
+          this.laMappings = [];
           this.cdr.detectChanges();
         },
         error: (err) => {
-          this.modMsg = err.error?.error ?? "Failed";
+          this.laMsg = err.error?.error ?? "Submission failed";
           this.cdr.detectChanges();
         },
       });
   }
 
-  // Mark the application as ready for transcript upload (transitions to "torUploaded" status)
-  markReadyForTranscript() {
-    this.svc.readyForTranscript(this.app._id).subscribe({
-      next: (data) => {
-        this.app = data;
-        this.readyMsg = "Application marked as ready for transcript upload";
-        this.cdr.detectChanges();
-      },
-      error: (err) => {
-        this.readyMsg = err.error?.error ?? "Failed";
+  downloadAgreement(versionNumber: number): void {
+    if (!this.app) return;
+
+    this.svc
+      .downloadLearningAgreement(this.app.application_id, versionNumber)
+      .subscribe({
+        next: (res) =>
+          saveResponseAsFile(res, `learning-agreement-v${versionNumber}.pdf`),
+        error: () => {
+          this.laMsg = "Download failed";
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  // ---- Mobility dates -----------------------------------------------------
+
+  // Recording the arrival is what starts the mobility, so the form opens
+  // as soon as the office has signed off the pre-departure check.
+  canEditDates(): boolean {
+    return (
+      this.app?.status === "pre_departure_completed" ||
+      this.app?.status === "mobility_in_progress"
+    );
+  }
+
+  saveDates(): void {
+    if (!this.app) return;
+
+    this.svc
+      .setMobilityDates(this.app.application_id, {
+        actual_arrival_date: this.arrival || undefined,
+        actual_departure_date: this.departure || undefined,
+      })
+      .subscribe({
+        next: (app) => {
+          this.apply(app);
+          this.datesMsg = "Dates saved";
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.datesMsg = err.error?.error ?? "Failed to save dates";
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  // ---- Transcript ---------------------------------------------------------
+
+  canUploadTranscript(): boolean {
+    return this.app?.status === "mobility_in_progress";
+  }
+
+  onTranscriptFile(event: Event): void {
+    this.transcriptFile = (event.target as HTMLInputElement).files?.[0] ?? null;
+  }
+
+  uploadTranscript(): void {
+    if (!this.app || !this.transcriptFile) return;
+
+    this.svc
+      .uploadTranscript(this.app.application_id, this.transcriptFile)
+      .subscribe({
+        next: (app) => {
+          this.apply(app);
+          this.transcriptMsg = "Transcript uploaded — exam recognition can begin";
+          this.transcriptFile = null;
+          this.cdr.detectChanges();
+        },
+        error: (err) => {
+          this.transcriptMsg = err.error?.error ?? "Upload failed";
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  downloadTranscript(): void {
+    if (!this.app) return;
+
+    this.svc.downloadTranscript(this.app.application_id).subscribe({
+      next: (res) => saveResponseAsFile(res, "transcript-of-records.pdf"),
+      error: () => {
+        this.transcriptMsg = "Download failed";
         this.cdr.detectChanges();
       },
     });
   }
 
-  // Capture Transcript of Records PDF file from file input
-  onToFile(e: Event) {
-    this.toFile = (e.target as HTMLInputElement).files?.[0] ?? null;
+  // ---- Exam results -------------------------------------------------------
+
+  canRecordResults(): boolean {
+    return this.app?.status === "under_exam_recognition";
   }
 
-  // Populate examScores array from the current exam mappings (one row per mapping)
-  initExamScores() {
-    this.examScores = this.app.examMappings.map((_: any, i: number) => ({
-      examMappingIndex: i,
-      score: "",
-      examDate: "",
+  // One row per mapping in the agreement in force, pre-filled with any
+  // grade already recorded.
+  startExamResults(): void {
+    const agreement = this.currentAgreement;
+
+    this.examResults = (agreement?.course_mappings ?? []).map((mapping) => ({
+      mapping_id: mapping.mapping_id,
+      foreign_grade: mapping.exam_result?.foreign_grade ?? "",
+      exam_date: mapping.exam_result?.exam_date ?? "",
     }));
   }
 
-  // Upload Transcript of Records PDF together with exam grades
-  uploadToR() {
-    if (!this.toFile) return;
-    this.svc.uploadTranscript(this.app._id, this.toFile, this.examScores).subscribe({
-      next: (data) => {
-        this.app = data;
-        this.toMsg = "Transcript uploaded";
-        this.toFile = null;
-        this.examScores = [];
+  // A grade the coordinator has already decided is no longer editable.
+  isResultDecided(mappingId: number): boolean {
+    const mapping = this.currentAgreement?.course_mappings.find(
+      (m) => m.mapping_id === mappingId
+    );
+
+    return Boolean(
+      mapping?.exam_result && mapping.exam_result.recognition_status !== "pending"
+    );
+  }
+
+  courseNameFor(mappingId: number): string {
+    const mapping = this.currentAgreement?.course_mappings.find(
+      (m) => m.mapping_id === mappingId
+    );
+
+    return mapping
+      ? `${mapping.foreign_course_name} → ${mapping.home_course_name}`
+      : "Unknown course";
+  }
+
+  submitExamResults(): void {
+    if (!this.app) return;
+
+    // Only send rows the student filled in and the coordinator has not
+    // already decided; the server rejects a change to a decided result.
+    const results = this.examResults.filter(
+      (row) =>
+        row.foreign_grade && row.exam_date && !this.isResultDecided(row.mapping_id)
+    );
+
+    if (results.length === 0) {
+      this.resultsMsg = "Enter a grade and date for at least one exam";
+      return;
+    }
+
+    this.svc.recordExamResults(this.app.application_id, results).subscribe({
+      next: (app) => {
+        this.apply(app);
+        this.resultsMsg = "Exam results submitted for recognition";
+        this.examResults = [];
         this.cdr.detectChanges();
       },
       error: (err) => {
-        this.toMsg = err.error?.error ?? "Failed";
+        this.resultsMsg = err.error?.error ?? "Failed to submit results";
         this.cdr.detectChanges();
       },
     });

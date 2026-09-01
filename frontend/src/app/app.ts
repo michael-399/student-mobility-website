@@ -1,10 +1,10 @@
 // app.ts — Root application component.
-// Serves as the shell for the entire SPA. It provides a router outlet
-// for page content and a logout action accessible from the layout.
+// Provides the router outlet for page content and the logout action.
 
 import { Component, inject } from "@angular/core";
 import { RouterOutlet, RouterLink } from "@angular/router";
 import { AuthService } from "./services/auth.service";
+import { fullName } from "./services/models";
 
 @Component({
   selector: "app-root",
@@ -14,12 +14,19 @@ import { AuthService } from "./services/auth.service";
   styleUrl: "./app.css",
 })
 export class App {
-  // Inject the auth service to access logout functionality and user state.
   auth = inject(AuthService);
 
-  // Clears auth data from local storage and redirects to the login page.
+  // Shown in the nav bar. The API returns names in two parts.
+  get displayName(): string {
+    return fullName(this.auth.getUser());
+  }
+
+  // Ends the server-side session before leaving, so the cookie is not
+  // left valid on the server after the user has signed out.
   logout() {
-    this.auth.logout();
-    window.location.href = "/login";
+    this.auth.logout().subscribe({
+      next: () => (window.location.href = "/login"),
+      error: () => (window.location.href = "/login"),
+    });
   }
 }

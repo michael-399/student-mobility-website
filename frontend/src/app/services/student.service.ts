@@ -1,92 +1,138 @@
-// student.service.ts — HTTP service for all student-facing API calls.
-// Covers CRUD on mobility applications, file uploads/downloads,
-// date management, modification proposals, and transcript submission.
+// student.service.ts — Student-facing API calls.
+//
+// Two shape changes from the previous backend are worth knowing:
+//
+//  * Creating an application no longer carries a file or course mappings.
+//    It is plain JSON; the Learning Agreement and its mappings are
+//    submitted afterwards, as a version.
+//  * There is no separate "propose modification" call. A revision is the
+//    next Learning Agreement version, so `submitLearningAgreement` serves
+//    the first submission, a resubmission after rejection, and a
+//    mid-mobility revision alike.
 
 import { Injectable, inject } from "@angular/core";
 import { HttpClient } from "@angular/common/http";
+import { map } from "rxjs";
+import type {
+  Application,
+  ApplicationDetail,
+  CourseMappingInput,
+  MobilityPeriod,
+} from "./models";
+
+export interface ApplicationInput {
+  academic_year: string;
+  host_institution_id: number;
+  expected_mobility_period: MobilityPeriod;
+  coordinator_id: number;
+  optional_note?: string | null;
+}
+
+export interface ExamResultInput {
+  mapping_id: number;
+  foreign_grade: string;
+  exam_date: string;
+}
 
 @Injectable({ providedIn: "root" })
 export class StudentService {
   private http = inject(HttpClient);
-  // Base path for all student application endpoints.
   private base = "/api/student/applications";
 
-  // Fetch all applications belonging to the authenticated student.
   list() {
-    return this.http.get<any[]>(this.base);
+    return this.http
+      .get<{ applications: Application[] }>(this.base)
+      .pipe(map((res) => res.applications));
   }
 
-  // Fetch a single application by its MongoDB _id.
-  getById(id: string) {
-    return this.http.get<any>(`${this.base}/${id}`);
+  getById(id: number | string) {
+    return this.http
+      .get<{ application: ApplicationDetail }>(`${this.base}/${id}`)
+      .pipe(map((res) => res.application));
   }
 
-  // Create a new mobility application. The supporting document (PDF/CV/etc.)
-  // is sent as multipart/form-data alongside the structured fields.
-  create(data: any, file: File) {
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("academicYear", data.academicYear);
-    fd.append("hostInstitutionId", data.hostInstitutionId);
-    fd.append("expectedPeriod", data.expectedPeriod);
-    fd.append("referentLecturerId", data.referentLecturerId);
-    // examMappings is a complex array — serialise to JSON for transport.
-    fd.append("examMappings", JSON.stringify(data.examMappings));
-    return this.http.post<any>(this.base, fd);
+  create(data: ApplicationInput) {
+    return this.http
+      .post<{ application: ApplicationDetail }>(this.base, data)
+      .pipe(map((res) => res.application));
   }
 
-  // Hard-delete an application (only allowed for draft/pending applications).
-  delete(id: string) {
-    return this.http.delete<any>(`${this.base}/${id}`);
+  update(id: number | string, changes: Partial<ApplicationInput>) {
+    return this.http
+      .patch<{ application: ApplicationDetail }>(`${this.base}/${id}`, changes)
+      .pipe(map((res) => res.application));
   }
 
-  // Cancel (soft-delete) an application that has already been submitted.
-  cancelApplication(id: string) {
-    return this.http.patch<any>(`${this.base}/${id}/cancel`, {});
+  delete(id: number | string) {
+    return this.http.delete<void>(`${this.base}/${id}`);
   }
 
-  // Upload a Learning Agreement PDF for a specific application.
-  uploadLA(id: string, file: File) {
-    const fd = new FormData();
-    fd.append("file", file);
-    return this.http.post<any>(`${this.base}/${id}/learning-agreement`, fd);
+  // Submits the next Learning Agreement version with its course mappings.
+  submitLearningAgreement(
+    id: number | string,
+    file: File,
+    mappings: CourseMappingInput[]
+  ) {
+    const form = new FormData();
+    form.append("file", file);
+    // A complex array cannot ride in multipart on its own, so it travels
+    // as a JSON field alongside the file.
+    form.append("course_mappings", JSON.stringify(mappings));
+
+    return this.http
+      .post<{ application: ApplicationDetail }>(
+        `${this.base}/${id}/learning-agreements`,
+        form
+      )
+      .pipe(map((res) => res.application));
   }
 
-  // Download a specific version of the Learning Agreement as a blob
-  // (used to trigger a browser file-save dialog).
-  downloadLA(id: string, index: number) {
-    return this.http.get(`${this.base}/${id}/learning-agreement/${index}/download`, {
+  downloadLearningAgreement(id: number | string, versionNumber: number) {
+    return this.http.get(
+      `${this.base}/${id}/learning-agreements/${versionNumber}/file`,
+      { responseType: "blob", observe: "response" }
+    );
+  }
+
+  // Recording the arrival is what starts the mobility.
+  setMobilityDates(
+    id: number | string,
+    dates: { actual_arrival_date?: string; actual_departure_date?: string }
+  ) {
+    return this.http
+      .patch<{ application: ApplicationDetail }>(
+        `${this.base}/${id}/mobility-dates`,
+        dates
+      )
+      .pipe(map((res) => res.application));
+  }
+
+  // Uploading the transcript opens exam recognition.
+  uploadTranscript(id: number | string, file: File) {
+    const form = new FormData();
+    form.append("file", file);
+
+    return this.http
+      .post<{ application: ApplicationDetail }>(
+        `${this.base}/${id}/transcript`,
+        form
+      )
+      .pipe(map((res) => res.application));
+  }
+
+  downloadTranscript(id: number | string) {
+    return this.http.get(`${this.base}/${id}/transcript/file`, {
       responseType: "blob",
       observe: "response",
     });
   }
 
-  // Set actual arrival/departure dates on an approved application.
-  setDates(id: string, data: { actualArrivalDate?: string; actualDepartureDate?: string }) {
-    return this.http.patch<any>(`${this.base}/${id}/dates`, data);
-  }
-
-  // Propose a modification to the Learning Agreement (e.g. change an exam).
-  proposeModification(id: string, file: File, data: { description: string; examMappingDiff: any[] }) {
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("description", data.description);
-    // Diff describing which exam mappings to add/remove/change.
-    fd.append("examMappingDiff", JSON.stringify(data.examMappingDiff));
-    return this.http.post<any>(`${this.base}/${id}/modifications`, fd);
-  }
-
-  // Mark the application as ready for transcript submission.
-  readyForTranscript(id: string) {
-    return this.http.patch<any>(`${this.base}/${id}/ready-for-transcript`, {});
-  }
-
-  // Upload the final transcript PDF with per-exam scores and dates.
-  uploadTranscript(id: string, file: File, examScores: { examMappingIndex: number; score: string; examDate: string }[]) {
-    const fd = new FormData();
-    fd.append("file", file);
-    // Serialise the array of exam score objects into a single JSON field.
-    fd.append("examScores", JSON.stringify(examScores));
-    return this.http.post<any>(`${this.base}/${id}/transcript`, fd);
+  recordExamResults(id: number | string, results: ExamResultInput[]) {
+    return this.http
+      .put<{ application: ApplicationDetail }>(
+        `${this.base}/${id}/exam-results`,
+        { exam_results: results }
+      )
+      .pipe(map((res) => res.application));
   }
 }

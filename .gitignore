@@ -10,16 +10,6 @@ Thumbs.db
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# --- backend-fastapi (Python) ---
-backend-fastapi/__pycache__/
-backend-fastapi/**/__pycache__/
-backend-fastapi/*.pyc
-backend-fastapi/.env
-backend-fastapi/uploads/
-backend-fastapi/.venv/
-backend-fastapi/venv/
-backend-fastapi/.pytest_cache/
-
 # --- services/database (Python) ---
 services/**/__pycache__/
 services/**/*.pyc
@@ -27,6 +17,7 @@ services/**/*.pyc
 .env.*
 !.env.example
 .venv/
+
 # --- frontend (Angular) ---
 frontend/dist/
 frontend/node_modules/
@@ -34,3 +25,8 @@ frontend/.angular/cache/
 frontend/npm-debug.log
 frontend/yarn-error.log
 frontend/coverage/
+graphify-out
+.gitignore
+
+# Uploaded Learning Agreements and transcripts
+services/database/uploads/

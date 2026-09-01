@@ -1,8 +1,9 @@
-# Root-level compose for the student-mobility (FastAPI) stack.
+# Root-level compose for the student-mobility stack.
 #
-#   Frontend  http://localhost:4200  ->  FastAPI :8000  ->  PostgreSQL
+#   Frontend  http://localhost:4200  ->  Flask :5000  ->  PostgreSQL
 #
-# Start with:  docker compose up --build
+# Start everything with:  docker compose up --build
+# Just the backend:       docker compose up --build flask-backend
 
 services:
   postgres:
@@ -12,39 +13,44 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=mobility
+      - POSTGRES_DB=mobility_flask
     volumes:
       - pg-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mobility"]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mobility_flask"]
       interval: 5s
       timeout: 5s
       retries: 10
 
-  backend:
-    build: ./backend-fastapi
+  flask-backend:
+    build: ./services/database
     ports:
-      - "8000:8000"
+      # Published on 5001: macOS runs an AirPlay Receiver on port 5000 by
+      # default, which answers before Docker's forward and returns 403.
+      - "5001:5000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mobility
-      - JWT_SECRET=taw-secret-key
-      - UPLOAD_DIR=uploads
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@postgres:5432/mobility_flask
+      # Development value. Generate a real one before deploying:
+      #   python -c "import secrets; print(secrets.token_hex(32))"
+      - SECRET_KEY=development-secret-key
+      - UPLOAD_DIR=/app/uploads
+      - CORS_ORIGINS=http://localhost:4200
+      - SEED_ON_START=true
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - ./backend-fastapi:/app
-      - py-uploads:/app/uploads
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+      - ./services/database:/app
+      - flask-uploads:/app/uploads
 
   frontend:
     build: ./frontend
     ports:
       - "4200:4200"
     environment:
-      - API_PROXY_TARGET=http://backend:8000
+      - API_PROXY_TARGET=http://flask-backend:5000
     depends_on:
-      - backend
+      - flask-backend
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -52,4 +58,4 @@ services:
 
 volumes:
   pg-data:
-  py-uploads:
+  flask-uploads:

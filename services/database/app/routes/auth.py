@@ -1,21 +1,13 @@
-from ..models import UserAccount, UserRole
-from .decorators import login_required, role_required
-
 from .decorators import login_required
 from flask import Blueprint, request, session
 
+from .. import repositories as repo
 from ..database import db
 from ..models import UserAccount
 from ..security import verify_password
 
 auth_bp = Blueprint("auth", __name__)
 
-def find_user_by_email(email: str):
-    return db.session.execute(
-        db.select(UserAccount).where(
-            UserAccount.email == email
-        )
-    ).scalar_one_or_none()
 
 @auth_bp.post("/login")
 def login():
@@ -29,7 +21,7 @@ def login():
             "error": "Email and password are required"
         }, 400
 
-    user = find_user_by_email(email)
+    user = repo.find_user_by_email(email)
 
     if user is None or not verify_password(
         user.password_hash,

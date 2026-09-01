@@ -1,0 +1,215 @@
+<div class="page-header">
+  <h1>Review Application</h1>
+  <a routerLink="/coordinator/dashboard" class="btn">Back</a>
+</div>
+
+@if (error) {
+  <p class="error">{{ error }}</p>
+}
+
+@if (loading) {
+  <p>Loading…</p>
+} @else if (app) {
+  <section class="card">
+    <div class="card-head">
+      <h2>{{ app.student.first_name }} {{ app.student.last_name }}</h2>
+      <span class="badge status-{{ app.status }}">{{ statusLabel[app.status] }}</span>
+    </div>
+    <dl class="details">
+      <dt>Academic Year</dt><dd>{{ app.academic_year }}</dd>
+      <dt>Host Institution</dt>
+      <dd>{{ app.host_institution.name }} — {{ app.host_institution.city }}, {{ app.host_institution.country }}</dd>
+      <dt>Period</dt><dd>{{ periodLabel[app.expected_mobility_period] }}</dd>
+      <dt>Student Email</dt><dd>{{ app.student.email }}</dd>
+      @if (app.optional_note) {
+        <dt>Notes</dt><dd>{{ app.optional_note }}</dd>
+      }
+      @if (app.actual_arrival_date) {
+        <dt>Mobility</dt>
+        <dd>
+          {{ app.actual_arrival_date | date: "mediumDate" }}
+          @if (app.actual_departure_date) {
+            – {{ app.actual_departure_date | date: "mediumDate" }}
+          }
+        </dd>
+      }
+    </dl>
+  </section>
+
+  <!-- Learning Agreement decision ---------------------------------------- -->
+  <section class="card">
+    <h2>Learning Agreements</h2>
+
+    @if (agreements.length === 0) {
+      <p class="empty">The student has not submitted one yet.</p>
+    } @else {
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Version</th>
+            <th>Uploaded</th>
+            <th>Status</th>
+            <th>Reason</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (agreement of agreements; track agreement.version_number) {
+            <tr>
+              <td>v{{ agreement.version_number }}</td>
+              <td>{{ agreement.uploaded_at | date: "medium" }}</td>
+              <td>
+                <span class="badge approval-{{ agreement.approval_status }}">
+                  {{ approvalLabel[agreement.approval_status] }}
+                </span>
+              </td>
+              <td>{{ agreement.rejection_reason ?? "—" }}</td>
+              <td>
+                <button class="btn btn-sm" (click)="downloadAgreement(agreement.version_number)">
+                  Download
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+    @if (laMsg) {
+      <p class="msg">{{ laMsg }}</p>
+    }
+
+    @if (pendingAgreement) {
+      <h3>
+        Awaiting your decision — v{{ pendingAgreement.version_number }}
+        @if (isRevision) {
+          <span class="tag">Revision</span>
+        }
+      </h3>
+
+      <p class="hint">
+        @if (isRevision) {
+          Approving this replaces the mapping currently in force. Rejecting it
+          leaves the previous approved mapping unchanged.
+        } @else {
+          Approving this lets the office complete the pre-departure check.
+          Rejecting it returns the application to the student to revise.
+        }
+      </p>
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Foreign Course</th>
+            <th>Credits</th>
+            <th>Home Course</th>
+            <th>Credits</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (mapping of pendingAgreement.course_mappings; track mapping.mapping_id) {
+            <tr>
+              <td>{{ mapping.foreign_course_code }} — {{ mapping.foreign_course_name }}</td>
+              <td>{{ mapping.foreign_course_credits }}</td>
+              <td>{{ mapping.home_course_code }} — {{ mapping.home_course_name }}</td>
+              <td>{{ mapping.home_course_credits }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="decision">
+        <button class="btn btn-primary" (click)="approveAgreement()">Approve</button>
+
+        <label class="reason-field">
+          Reason for rejection
+          <textarea name="laReason" [(ngModel)]="laReason" rows="2"
+                    placeholder="Required when rejecting"></textarea>
+        </label>
+
+        <button class="btn btn-danger" [disabled]="!laReason.trim()" (click)="rejectAgreement()">
+          Reject
+        </button>
+      </div>
+    }
+  </section>
+
+  <!-- Exam recognition ---------------------------------------------------- -->
+  @if (app.transcript) {
+    <section class="card">
+      <h2>Exam Recognition</h2>
+
+      <p>
+        Transcript uploaded {{ app.transcript.uploaded_at | date: "medium" }}
+        <button class="btn btn-sm" (click)="downloadTranscript()">Download</button>
+      </p>
+
+      @if (resultMsg) {
+        <p class="msg">{{ resultMsg }}</p>
+      }
+
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Course</th>
+            <th>Grade</th>
+            <th>Exam Date</th>
+            <th>Status</th>
+            <th>Decision</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (mapping of recognitionMappings; track mapping.mapping_id) {
+            <tr>
+              <td>{{ mapping.foreign_course_name }} → {{ mapping.home_course_name }}</td>
+              <td>{{ mapping.exam_result?.foreign_grade ?? "—" }}</td>
+              <td>
+                {{ mapping.exam_result?.exam_date
+                    ? (mapping.exam_result?.exam_date | date: "mediumDate")
+                    : "—" }}
+              </td>
+              <td>
+                @if (mapping.exam_result) {
+                  <span class="badge approval-{{ mapping.exam_result.recognition_status }}">
+                    {{ approvalLabel[mapping.exam_result.recognition_status] }}
+                  </span>
+                } @else {
+                  <span class="empty">Not submitted</span>
+                }
+              </td>
+              <td>
+                @if (mapping.exam_result && mapping.exam_result.recognition_status === "pending") {
+                  <div class="decision inline">
+                    <button class="btn btn-sm btn-primary"
+                            (click)="approveResult(mapping.exam_result.result_id)">
+                      Approve
+                    </button>
+                    <input [(ngModel)]="resultReasons[mapping.exam_result.result_id]"
+                           [name]="'reason' + mapping.exam_result.result_id"
+                           placeholder="Reason to reject" />
+                    <button class="btn btn-sm btn-danger"
+                            [disabled]="!resultReasons[mapping.exam_result.result_id]?.trim()"
+                            (click)="rejectResult(mapping.exam_result.result_id)">
+                      Reject
+                    </button>
+                  </div>
+                } @else if (mapping.exam_result?.rejection_reason) {
+                  <span class="reason">{{ mapping.exam_result?.rejection_reason }}</span>
+                } @else {
+                  —
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      @if (!hasPendingResults()) {
+        <p class="notice">
+          Every submitted exam has been decided. The office can close this
+          application.
+        </p>
+      }
+    </section>
+  }
+}

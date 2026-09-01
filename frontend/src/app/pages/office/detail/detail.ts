@@ -1,96 +1,151 @@
-// Office Application Detail Component
-// Loads a single student mobility application by route ID for administrative review.
-// Office staff can view all application data (read-only) and perform state transitions:
-// - Mark pre-departure applications as "in progress"
-// - Close applications that have reached the score-approval stage
+// OfficeDetailComponent — administrative view of one application.
+//
+// The office owns two gates: signing off the pre-departure check once the
+// coordinator has approved a Learning Agreement, and closing the
+// application once every submitted exam has been decided. Everything else
+// here is read-only.
 import { Component, OnInit, inject, ChangeDetectorRef } from "@angular/core";
 import { ActivatedRoute, RouterLink } from "@angular/router";
 import { DatePipe } from "@angular/common";
 import { OfficeService } from "../../../services/office.service";
+import { saveResponseAsFile } from "../../../services/download";
+import {
+  APPROVAL_LABEL,
+  PERIOD_LABEL,
+  STATUS_LABEL,
+  currentAgreement,
+  type ApplicationDetail,
+  type CourseMapping,
+  type LearningAgreement,
+} from "../../../services/models";
 
 @Component({
   selector: "app-office-detail",
   standalone: true,
-  imports: [RouterLink, DatePipe], // No FormsModule needed; office has no text inputs
+  imports: [RouterLink, DatePipe],
   templateUrl: "./detail.html",
-  styleUrl: "./detail.css",
 })
 export class OfficeDetailComponent implements OnInit {
-  // Inject route (to read the :id param), API service, and change detector
   private route = inject(ActivatedRoute);
   private svc = inject(OfficeService);
   private cdr = inject(ChangeDetectorRef);
 
-  // Application data and UI state
-  app: any = null;
+  app: ApplicationDetail | null = null;
   loading = true;
   error = "";
-  actionMsg = "";  // Feedback message shown after administrative actions
+  actionMsg = "";
 
-  // Maps API period keys to human-readable labels
-  periodLabel: Record<string, string> = {
-    first_semester: "First Semester",
-    second_semester: "Second Semester",
-    entire_year: "Entire Academic Year",
-  };
+  periodLabel = PERIOD_LABEL;
+  statusLabel = STATUS_LABEL;
+  approvalLabel = APPROVAL_LABEL;
 
-  // Maps API status keys to human-readable labels for the status badge
-  statusLabel: Record<string, string> = {
-    created: "Created",
-    awaitingLA: "Awaiting LA Approval",
-    "needs modifications": "Needs Modifications",
-    preDepartureDone: "Pre-departure Done",
-    inProgress: "Mobility in Progress",
-    torUploaded: "Waiting for Score Approval",
-    closed: "Closed",
-    canceled: "Canceled",
-  };
-
-  // Extract the application ID from the route and fetch its full data
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get("id")!;
     this.svc.getById(id).subscribe({
-      next: (data) => {
-        this.app = data;
+      next: (app) => {
+        this.app = app;
         this.loading = false;
         this.cdr.detectChanges();
       },
+      error: (err) => {
+        this.error = err.error?.error ?? "Application not found";
+        this.loading = false;
+        this.cdr.detectChanges();
+      },
+    });
+  }
+
+  get agreements(): LearningAgreement[] {
+    return this.app?.learning_agreements ?? [];
+  }
+
+  get currentAgreement(): LearningAgreement | null {
+    return currentAgreement(this.app);
+  }
+
+  get recognitionMappings(): CourseMapping[] {
+    return this.currentAgreement?.course_mappings ?? [];
+  }
+
+  // Requires an approved agreement, which the server checks too; showing
+  // the button only when it can succeed avoids an error the user cannot act on.
+  canCompletePreDeparture(): boolean {
+    return (
+      this.app?.status === "waiting_la_approval" && this.currentAgreement !== null
+    );
+  }
+
+  canClose(): boolean {
+    if (this.app?.status !== "under_exam_recognition") return false;
+    if (!this.app.transcript) return false;
+
+    const results = this.recognitionMappings
+      .map((mapping) => mapping.exam_result)
+      .filter((result) => result !== null);
+
+    return (
+      results.length > 0 &&
+      results.every((result) => result!.recognition_status !== "pending")
+    );
+  }
+
+  // Why the close button is not available yet, so the office is not left
+  // guessing what it is waiting on.
+  get closeBlockedReason(): string {
+    if (this.app?.status !== "under_exam_recognition") {
+      return "Available once the transcript has been uploaded.";
+    }
+
+    const results = this.recognitionMappings
+      .map((mapping) => mapping.exam_result)
+      .filter((result) => result !== null);
+
+    if (results.length === 0) {
+      return "Waiting for the student to submit exam results.";
+    }
+
+    if (results.some((result) => result!.recognition_status === "pending")) {
+      return "Waiting for the coordinator to decide every exam recognition.";
+    }
+
+    return "";
+  }
+
+  downloadAgreement(versionNumber: number): void {
+    if (!this.app) return;
+
+    this.svc
+      .downloadLearningAgreement(this.app.application_id, versionNumber)
+      .subscribe({
+        next: (res) =>
+          saveResponseAsFile(res, `learning-agreement-v${versionNumber}.pdf`),
+        error: () => {
+          this.actionMsg = "Download failed";
+          this.cdr.detectChanges();
+        },
+      });
+  }
+
+  downloadTranscript(): void {
+    if (!this.app) return;
+
+    this.svc.downloadTranscript(this.app.application_id).subscribe({
+      next: (res) => saveResponseAsFile(res, "transcript-of-records.pdf"),
       error: () => {
-        this.error = "Application not found";
-        this.loading = false;
+        this.actionMsg = "Download failed";
         this.cdr.detectChanges();
       },
     });
   }
 
-  // Triggers a browser download of a Learning Agreement file by index
-  downloadLA(index: number) {
-    this.svc.downloadLA(this.app._id, index).subscribe({
-      next: (res) => {
-        const filename = this.app.learningAgreements?.[index]?.fileName ?? "learning-agreement";
-        // Create a temporary download link from the blob response
-        const url = window.URL.createObjectURL(res.body!);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url); // Clean up the object URL
-      },
-    });
-  }
+  completePreDeparture(): void {
+    if (!this.app) return;
 
-  // Constructs a display name for an exam by looking up its mapping
-  getExamName(index: number): string {
-    const mapping = this.app?.examMappings?.[index];
-    return mapping ? `${mapping.foreignCourseName} (${mapping.localCourseName})` : "Unknown";
-  }
-
-  // Transition the application from "preDepartureDone" to "inProgress"
-  markInProgress() {
-    this.svc.markInProgress(this.app._id).subscribe({
-      next: (data) => {
-        this.app = data;          // Replace with updated application from server
-        this.actionMsg = "Application marked as in progress";
+    this.svc.completePreDeparture(this.app.application_id).subscribe({
+      next: (app) => {
+        this.app = app;
+        this.actionMsg =
+          "Pre-departure check complete — the mobility starts when the student records their arrival";
         this.cdr.detectChanges();
       },
       error: (err) => {
@@ -100,13 +155,13 @@ export class OfficeDetailComponent implements OnInit {
     });
   }
 
-  // Close the application (final state transition, irreversible)
-  // Prompts for confirmation before proceeding
-  closeApplication() {
-    if (!confirm("Close this application? This cannot be undone.")) return;
-    this.svc.closeApplication(this.app._id).subscribe({
-      next: (data) => {
-        this.app = data;
+  closeApplication(): void {
+    if (!this.app) return;
+    if (!confirm("Close this application? It cannot be modified afterwards.")) return;
+
+    this.svc.closeApplication(this.app.application_id).subscribe({
+      next: (app) => {
+        this.app = app;
         this.actionMsg = "Application closed";
         this.cdr.detectChanges();
       },

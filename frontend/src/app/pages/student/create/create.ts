@@ -1,48 +1,45 @@
-// StudentCreateComponent – form for creating a new student mobility application.
-// Collects academic year, host institution, referent lecturer, expected period,
-// exam mappings (course equivalences between home and host institutions), and the Learning Agreement PDF.
+// StudentCreateComponent — form for starting a new mobility application.
+//
+// Creation now collects only the application itself: academic year, host
+// institution, coordinator, expected period, and an optional note. The
+// Learning Agreement and its course mappings are submitted afterwards
+// from the detail page, because the backend models them as a version that
+// the coordinator approves or rejects on its own.
 import { Component, OnInit, inject, ChangeDetectorRef } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router, RouterLink } from "@angular/router";
-import { InstitutionService, type Institution, type Lecturer } from "../../../services/institution.service";
+import { ReferenceService } from "../../../services/reference.service";
 import { StudentService } from "../../../services/student.service";
+import type { Institution, MobilityPeriod, User } from "../../../services/models";
 
 @Component({
   selector: "app-student-create",
   standalone: true,
   imports: [FormsModule, RouterLink],
   templateUrl: "./create.html",
-  styleUrl: "./create.css",
 })
 export class StudentCreateComponent implements OnInit {
-  private instSvc = inject(InstitutionService);
+  private refSvc = inject(ReferenceService);
   private stuSvc = inject(StudentService);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
 
-  // Dropdown data loaded from the backend
   institutions: Institution[] = [];
-  lecturers: Lecturer[] = [];
+  coordinators: User[] = [];
   error = "";
   submitting = false;
 
-  // Form model fields – bound via ngModel in the template
-  academicYear = "2025/2026";
-  hostInstitutionId = "";
-  referentLecturerId = "";
-  expectedPeriod = "first_semester";
+  // Form model, bound via ngModel.
+  academic_year = "2025/2026";
+  host_institution_id: number | null = null;
+  coordinator_id: number | null = null;
+  expected_mobility_period: MobilityPeriod = "first_semester";
+  optional_note = "";
 
-  // Exam mapping rows: each row maps a local course to a foreign (host) course
-  examMappings = [{ foreignTeachingCode: "", foreignCourseName: "", foreignCredits: 6, localCourseCode: "", localCourseName: "", localCredits: 6 }];
-
-  // Learning Agreement PDF file selected by the user
-  laFile: File | null = null;
-
-  // Load institutions and lecturers dropdowns on init (parallel requests)
   ngOnInit(): void {
-    this.instSvc.listInstitutions().subscribe({
-      next: (insts) => {
-        this.institutions = insts;
+    this.refSvc.listInstitutions().subscribe({
+      next: (institutions) => {
+        this.institutions = institutions;
         this.cdr.detectChanges();
       },
       error: () => {
@@ -50,71 +47,44 @@ export class StudentCreateComponent implements OnInit {
         this.cdr.detectChanges();
       },
     });
-    this.instSvc.listLecturers().subscribe({
-      next: (lecs) => {
-        this.lecturers = lecs;
+    this.refSvc.listCoordinators().subscribe({
+      next: (coordinators) => {
+        this.coordinators = coordinators;
         this.cdr.detectChanges();
       },
       error: () => {
-        this.error = "Failed to load lecturers";
+        this.error = "Failed to load coordinators";
         this.cdr.detectChanges();
       },
     });
   }
 
-  // Capture the Learning Agreement PDF file from the file input
-  onLAFile(e: Event) {
-    this.laFile = (e.target as HTMLInputElement).files?.[0] ?? null;
-  }
-
-  // Add a new empty exam mapping row
-  addRow() {
-    this.examMappings.push({ foreignTeachingCode: "", foreignCourseName: "", foreignCredits: 6, localCourseCode: "", localCourseName: "", localCredits: 6 });
-  }
-
-  // Remove an exam mapping row by index
-  removeRow(i: number) {
-    this.examMappings.splice(i, 1);
-  }
-
-  // Validate form: host + lecturer selected, LA file uploaded, at least one complete mapping
   canSubmit(): boolean {
-    if (!this.hostInstitutionId || !this.referentLecturerId) return false;
-    if (!this.laFile) return false;
-    const validMappings = this.examMappings.filter(
-      (m) => m.foreignTeachingCode && m.foreignCourseName && m.localCourseCode && m.localCourseName
+    return Boolean(
+      this.academic_year && this.host_institution_id && this.coordinator_id
     );
-    return validMappings.length > 0;
   }
 
-  // Submit the form: send all fields + LA file to the backend, then navigate to dashboard
   submit() {
     if (!this.canSubmit()) return;
-
-    // Filter out incomplete mapping rows before sending
-    const mappings = this.examMappings.filter(
-      (m) => m.foreignTeachingCode && m.foreignCourseName && m.localCourseCode && m.localCourseName
-    );
 
     this.submitting = true;
     this.error = "";
 
-    // multipart/form-data: application JSON fields + the LA PDF file
     this.stuSvc
       .create({
-        academicYear: this.academicYear,
-        hostInstitutionId: this.hostInstitutionId,
-        referentLecturerId: this.referentLecturerId,
-        expectedPeriod: this.expectedPeriod,
-        examMappings: mappings,
-      }, this.laFile!)
+        academic_year: this.academic_year,
+        host_institution_id: this.host_institution_id!,
+        coordinator_id: this.coordinator_id!,
+        expected_mobility_period: this.expected_mobility_period,
+        optional_note: this.optional_note || null,
+      })
       .subscribe({
-        next: () => {
-          // On success, redirect to the dashboard
-          this.router.navigateByUrl("/student/dashboard", { skipLocationChange: false });
-        },
+        // Straight to the detail page: the next thing to do is upload the
+        // Learning Agreement, and that is where it happens.
+        next: (app) => this.router.navigate(["/student", app.application_id]),
         error: (err) => {
-          this.error = err.error?.error ?? "Failed to create";
+          this.error = err.error?.error ?? "Failed to create application";
           this.submitting = false;
           this.cdr.detectChanges();
         },
